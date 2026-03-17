@@ -1,5 +1,7 @@
 #pragma once
 
+#include "game/BuildQueue.h"
+
 #include <cstdint>
 #include <set>
 #include <string>
@@ -34,6 +36,10 @@ class City {
     /// Check whether the city occupies the given tile.
     [[nodiscard]] bool containsTile(int row, int col) const;
 
+    [[nodiscard]] BuildQueue &buildQueue();
+    [[nodiscard]] const BuildQueue &buildQueue() const;
+    [[nodiscard]] static int productionPerTurn();
+
   private:
     CityId id_ = 0;
     std::string name_;
@@ -42,6 +48,7 @@ class City {
     int factionId_;
     int population_ = 1;
     std::set<std::pair<int, int>> tiles_;
+    BuildQueue buildQueue_;
 };
 
 } // namespace game
