@@ -1,6 +1,7 @@
 #include "engine/HexGrid.h"
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 namespace engine::hex {
