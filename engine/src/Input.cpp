@@ -12,7 +12,7 @@ std::optional<Vector3> mouseToGround(Camera3D cam) {
 
     // Intersect ray with the XZ plane (Y = 0).
     // ray.position.y + t * ray.direction.y = 0
-    if (std::abs(ray.direction.y) < 0.0001F) {
+    if (std::abs(ray.direction.y) < EPSILON) {
         return std::nullopt; // Ray is parallel to the ground.
     }
 

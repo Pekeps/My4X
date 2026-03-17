@@ -2,7 +2,7 @@
 
 namespace game {
 
-Tile::Tile(int row, int col, TerrainType terrain) : col_(col), row_(row), terrain_(terrain) {}
+Tile::Tile(int row, int col, TerrainType terrain) : row_(row), col_(col), terrain_(terrain) {}
 
 int Tile::col() const { return col_; }
 

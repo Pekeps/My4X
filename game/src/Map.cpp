@@ -22,7 +22,7 @@ std::vector<std::vector<Tile>> generateTiles(int height, int width, std::uint64_
         std::vector<Tile> rowTiles;
         rowTiles.reserve(width);
         for (int col = 0; col < width; ++col) {
-            rowTiles.emplace_back(row, col, allTerrains[dist(rng)]);
+            rowTiles.emplace_back(row, col, allTerrains.at(dist(rng)));
         }
         tiles.push_back(std::move(rowTiles));
     }
