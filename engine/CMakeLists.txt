@@ -1,6 +1,8 @@
 add_library(my4x_engine STATIC
     src/Window.cpp
+    src/HexGrid.cpp
     src/MapRenderer.cpp
+    src/UnitRenderer.cpp
     src/Camera.cpp
 )
 

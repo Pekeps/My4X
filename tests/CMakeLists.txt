@@ -1,5 +1,7 @@
 add_executable(my4x_tests
     game/test_game_state.cpp
+    game/test_unit.cpp
+    engine/test_hex_grid.cpp
 )
 
 target_link_libraries(my4x_tests PRIVATE my4x_game my4x_engine GTest::gtest_main)

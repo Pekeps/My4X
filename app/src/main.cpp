@@ -1,12 +1,16 @@
 #include "engine/Camera.h"
 #include "engine/MapRenderer.h"
+#include "engine/UnitRenderer.h"
 #include "engine/Window.h"
 #include "game/GameState.h"
 #include "game/Map.h"
+#include "game/Warrior.h"
 
 #include "raylib.h"
 
+#include <memory>
 #include <string>
+#include <vector>
 
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
@@ -27,6 +31,9 @@ int main() {
     game::Map map(MAP_ROWS, MAP_COLS);
     engine::Camera camera;
 
+    std::vector<std::unique_ptr<game::Unit>> units;
+    units.push_back(std::make_unique<game::Warrior>(5, 3));
+
     while (engine::window::isRunning()) {
         camera.update();
 
@@ -35,6 +42,7 @@ int main() {
         Camera3D cam = camera.raw();
         BeginMode3D(cam);
         engine::drawMap(map);
+        engine::drawUnits(units);
         EndMode3D();
 
         // HUD drawn in 2D on top of the 3D scene.
