@@ -20,7 +20,7 @@ void TileRegistry::unregisterUnit(int row, int col, Unit *unit) {
         return;
     }
     auto &vec = iter->second;
-    vec.erase(std::remove(vec.begin(), vec.end(), unit), vec.end());
+    std::erase(vec, unit);
     if (vec.empty()) {
         units_.erase(iter);
     }
@@ -51,7 +51,7 @@ std::vector<Unit *> TileRegistry::unitsAt(int row, int col) const {
 }
 
 bool TileRegistry::isOccupied(int row, int col) const {
-    TileCoord coord{row, col};
+    TileCoord coord{.row = row, .col = col};
     return cities_.contains(coord) || buildings_.contains(coord) || units_.contains(coord);
 }
 
