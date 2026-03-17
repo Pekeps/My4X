@@ -2,6 +2,7 @@
 
 #include "game/Tile.h"
 
+#include <cstdint>
 #include <vector>
 
 namespace game {
@@ -9,6 +10,7 @@ namespace game {
 class Map {
   public:
     Map(int height, int width);
+    Map(int height, int width, std::uint64_t seed);
 
     [[nodiscard]] const Tile &tile(int row, int col) const;
     [[nodiscard]] int width() const;

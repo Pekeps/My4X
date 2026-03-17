@@ -90,9 +90,8 @@ int main() {
 
         if (selectedUnit != NO_SELECTION) {
             const auto &unit = units.at(selectedUnit);
-            std::string unitInfo =
-                unit->name() + " | HP: " + std::to_string(unit->health()) +
-                " | Moves: " + std::to_string(unit->movementRemaining());
+            std::string unitInfo = unit->name() + " | HP: " + std::to_string(unit->health()) +
+                                   " | Moves: " + std::to_string(unit->movementRemaining());
             DrawText(unitInfo.c_str(), HUD_TEXT_X, HUD_HINT_Y + HUD_HINT_SIZE + 5, HUD_HINT_SIZE, YELLOW);
         }
 
