@@ -1,0 +1,14 @@
+add_executable(my4x_tests
+    game/test_game_state.cpp
+)
+
+target_link_libraries(my4x_tests PRIVATE my4x_game my4x_engine GTest::gtest_main)
+
+include(GoogleTest)
+gtest_discover_tests(my4x_tests)
+
+if(MSVC)
+    target_compile_options(my4x_tests PRIVATE /W4)
+else()
+    target_compile_options(my4x_tests PRIVATE -Wall -Wextra -Wpedantic)
+endif()
