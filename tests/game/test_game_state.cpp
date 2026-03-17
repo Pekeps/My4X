@@ -31,18 +31,18 @@ TEST(GameStateTest, MapDimensions) {
 
 TEST(GameStateTest, AddCityRegistersInTileRegistry) {
     game::GameState state(4, 4);
-    game::City city{.id = 0, .row = 1, .col = 2, .name = "TestCity"};
+    game::City city("TestCity", 1, 2);
     game::CityId id = state.addCity(city);
 
     EXPECT_EQ(state.cities().size(), 1);
-    EXPECT_EQ(state.cities().front().name, "TestCity");
+    EXPECT_EQ(state.cities().front().name(), "TestCity");
     EXPECT_TRUE(state.registry().cityAt(1, 2).has_value());
     EXPECT_EQ(state.registry().cityAt(1, 2).value(), id);
 }
 
 TEST(GameStateTest, RemoveCityUnregistersFromTileRegistry) {
     game::GameState state(4, 4);
-    game::City city{.id = 0, .row = 1, .col = 2, .name = "TestCity"};
+    game::City city("TestCity", 1, 2);
     game::CityId id = state.addCity(city);
 
     state.removeCity(id);
@@ -59,19 +59,19 @@ TEST(GameStateTest, RemoveNonExistentCityThrows) {
 
 TEST(GameStateTest, AddBuildingRegistersInTileRegistry) {
     game::GameState state(4, 4);
-    game::Building building{.id = 0, .row = 2, .col = 3, .name = "Farm"};
-    game::BuildingId id = state.addBuilding(building);
+    auto farm = game::makeFarm(2, 3);
+    game::BuildingId id = state.addBuilding(farm);
 
     EXPECT_EQ(state.buildings().size(), 1);
-    EXPECT_EQ(state.buildings().front().name, "Farm");
+    EXPECT_EQ(state.buildings().front().name(), "Farm");
     EXPECT_TRUE(state.registry().buildingAt(2, 3).has_value());
     EXPECT_EQ(state.registry().buildingAt(2, 3).value(), id);
 }
 
 TEST(GameStateTest, RemoveBuildingUnregistersFromTileRegistry) {
     game::GameState state(4, 4);
-    game::Building building{.id = 0, .row = 2, .col = 3, .name = "Farm"};
-    game::BuildingId id = state.addBuilding(building);
+    auto farm = game::makeFarm(2, 3);
+    game::BuildingId id = state.addBuilding(farm);
 
     state.removeBuilding(id);
     EXPECT_TRUE(state.buildings().empty());
@@ -118,12 +118,12 @@ TEST(GameStateTest, RemoveUnitOutOfRangeThrows) {
 
 TEST(GameStateTest, FactionResourcesDefaultToZero) {
     game::GameState state(4, 4);
-    EXPECT_EQ(state.factionResources(), (game::Resource{0, 0, 0}));
+    EXPECT_EQ(state.factionResources(), (game::Resource{.gold = 0, .production = 0, .food = 0}));
 }
 
 TEST(GameStateTest, FactionResourcesMutable) {
     game::GameState state(4, 4);
-    state.factionResources() += game::Resource{100, 50, 25};
+    state.factionResources() += game::Resource{.gold = 100, .production = 50, .food = 25};
     EXPECT_EQ(state.factionResources().gold, 100);
     EXPECT_EQ(state.factionResources().production, 50);
     EXPECT_EQ(state.factionResources().food, 25);

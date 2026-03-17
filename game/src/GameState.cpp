@@ -26,18 +26,18 @@ const TileRegistry &GameState::registry() const { return registry_; }
 // -- Cities ------------------------------------------------------------
 
 CityId GameState::addCity(City city) {
-    city.id = nextCityId_++;
-    registry_.registerCity(city.row, city.col, city.id);
+    city.setId(nextCityId_++);
+    registry_.registerCity(city.centerRow(), city.centerCol(), city.id());
     cities_.push_back(std::move(city));
-    return cities_.back().id;
+    return cities_.back().id();
 }
 
 void GameState::removeCity(CityId id) {
-    auto iter = std::ranges::find_if(cities_, [id](const City &c) { return c.id == id; });
+    auto iter = std::ranges::find_if(cities_, [id](const City &c) { return c.id() == id; });
     if (iter == cities_.end()) {
         throw std::out_of_range("City not found");
     }
-    registry_.unregisterCity(iter->row, iter->col);
+    registry_.unregisterCity(iter->centerRow(), iter->centerCol());
     cities_.erase(iter);
 }
 
@@ -46,18 +46,26 @@ const std::vector<City> &GameState::cities() const { return cities_; }
 // -- Buildings ---------------------------------------------------------
 
 BuildingId GameState::addBuilding(Building building) {
-    building.id = nextBuildingId_++;
-    registry_.registerBuilding(building.row, building.col, building.id);
+    building.setId(nextBuildingId_++);
+    auto const &tiles = building.occupiedTiles();
+    if (!tiles.empty()) {
+        auto const &first = *tiles.begin();
+        registry_.registerBuilding(first.row, first.col, building.id());
+    }
     buildings_.push_back(std::move(building));
-    return buildings_.back().id;
+    return buildings_.back().id();
 }
 
 void GameState::removeBuilding(BuildingId id) {
-    auto iter = std::ranges::find_if(buildings_, [id](const Building &b) { return b.id == id; });
+    auto iter = std::ranges::find_if(buildings_, [id](const Building &b) { return b.id() == id; });
     if (iter == buildings_.end()) {
         throw std::out_of_range("Building not found");
     }
-    registry_.unregisterBuilding(iter->row, iter->col);
+    auto const &tiles = iter->occupiedTiles();
+    if (!tiles.empty()) {
+        auto const &first = *tiles.begin();
+        registry_.unregisterBuilding(first.row, first.col);
+    }
     buildings_.erase(iter);
 }
 
