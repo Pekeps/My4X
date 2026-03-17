@@ -9,6 +9,7 @@ add_library(my4x_game STATIC
     src/Building.cpp
     src/City.cpp
     src/Serialization.cpp
+    src/BuildQueue.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
