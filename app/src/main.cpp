@@ -35,7 +35,6 @@ int main() {
     engine::Camera camera;
 
     std::vector<std::unique_ptr<game::Unit>> units;
-    units.push_back(std::make_unique<game::Warrior>(5, 3));
 
     int selectedUnit = NO_SELECTION;
 
@@ -43,35 +42,6 @@ int main() {
         camera.update();
 
         Camera3D cam = camera.raw();
-
-        // Handle mouse click: select unit or move selected unit.
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            auto clicked = engine::input::mouseToTile(cam, MAP_ROWS, MAP_COLS);
-            if (clicked) {
-                // Check if a unit is on the clicked tile.
-                int clickedUnit = NO_SELECTION;
-                for (int i = 0; i < static_cast<int>(units.size()); ++i) {
-                    if (units.at(i)->isAlive() && units.at(i)->row() == clicked->row &&
-                        units.at(i)->col() == clicked->col) {
-                        clickedUnit = i;
-                        break;
-                    }
-                }
-
-                if (clickedUnit != NO_SELECTION) {
-                    // Clicked on a unit: select it.
-                    selectedUnit = clickedUnit;
-                } else if (selectedUnit != NO_SELECTION && units.at(selectedUnit)->movementRemaining() > 0) {
-                    // Clicked on empty tile with a unit selected: move it.
-                    units.at(selectedUnit)->moveTo(clicked->row, clicked->col);
-                }
-            }
-        }
-
-        // Right-click to deselect.
-        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-            selectedUnit = NO_SELECTION;
-        }
 
         // Highlight tile under mouse cursor.
         auto hoveredTile = engine::input::mouseToTile(cam, MAP_ROWS, MAP_COLS);
@@ -90,10 +60,9 @@ int main() {
 
         if (selectedUnit != NO_SELECTION) {
             const auto &unit = units.at(selectedUnit);
-            std::string unitInfo =
-                unit->name() + " | HP: " + std::to_string(unit->health()) +
-                " | Moves: " + std::to_string(unit->movementRemaining());
-            DrawText(unitInfo.c_str(), HUD_TEXT_X, HUD_HINT_Y + HUD_HINT_SIZE + 5, HUD_HINT_SIZE, YELLOW);
+            std::string unitInfo = unit->name() + " | HP: " + std::to_string(unit->health()) +
+                                   " | Moves: " + std::to_string(unit->movementRemaining());
+            DrawText(unitInfo.c_str(), HUD_TEXT_X, HUD_HINT_Y + HUD_HINT_SIZE, HUD_HINT_SIZE, YELLOW);
         }
 
         if (IsKeyPressed(KEY_SPACE)) {
