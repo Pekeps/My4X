@@ -4,6 +4,7 @@ add_library(my4x_game STATIC
     src/Map.cpp
     src/Unit.cpp
     src/Warrior.cpp
+    src/Resource.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
