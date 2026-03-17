@@ -1,22 +1,25 @@
 #pragma once
 #include "game/Building.h"
-#include <cstdint>
+#include <functional>
 #include <optional>
 #include <queue>
+#include <string>
 
 namespace game {
 
-enum class BuildingType : std::uint8_t { Farm, Mine, Market };
+using BuildingFactory = std::function<Building(int row, int col)>;
 
 struct BuildQueueItem {
-    BuildingType type;
+    std::string name;
+    int productionCost;
     int targetRow;
     int targetCol;
+    BuildingFactory factory;
 };
 
 class BuildQueue {
   public:
-    void enqueue(BuildingType type, int targetRow, int targetCol);
+    void enqueue(BuildingFactory factory, int targetRow, int targetCol);
     [[nodiscard]] std::optional<BuildQueueItem> currentItem() const;
     [[nodiscard]] int turnsRemaining(int productionPerTurn) const;
     [[nodiscard]] int accumulatedProduction() const;
@@ -28,7 +31,6 @@ class BuildQueue {
   private:
     std::queue<BuildQueueItem> queue_;
     int accumulated_ = 0;
-    [[nodiscard]] static int buildingCost(BuildingType type);
 };
 
 } // namespace game

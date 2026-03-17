@@ -2,20 +2,13 @@
 
 namespace game {
 
-int BuildQueue::buildingCost(BuildingType type) {
-    switch (type) {
-    case BuildingType::Farm:
-        return makeFarm(0, 0).constructionCost().production;
-    case BuildingType::Mine:
-        return makeMine(0, 0).constructionCost().production;
-    case BuildingType::Market:
-        return makeMarket(0, 0).constructionCost().production;
-    }
-    return 0;
-}
-
-void BuildQueue::enqueue(BuildingType type, int targetRow, int targetCol) {
-    queue_.push(BuildQueueItem{.type = type, .targetRow = targetRow, .targetCol = targetCol});
+void BuildQueue::enqueue(BuildingFactory factory, int targetRow, int targetCol) {
+    auto prototype = factory(0, 0);
+    queue_.push(BuildQueueItem{.name = prototype.name(),
+                               .productionCost = prototype.constructionCost().production,
+                               .targetRow = targetRow,
+                               .targetCol = targetCol,
+                               .factory = std::move(factory)});
 }
 
 std::optional<BuildQueueItem> BuildQueue::currentItem() const {
@@ -29,7 +22,7 @@ int BuildQueue::turnsRemaining(int productionPerTurn) const {
     if (queue_.empty() || productionPerTurn <= 0) {
         return 0;
     }
-    const int cost = buildingCost(queue_.front().type);
+    const int cost = queue_.front().productionCost;
     return (cost - accumulated_ + productionPerTurn - 1) / productionPerTurn;
 }
 
@@ -40,18 +33,12 @@ std::optional<Building> BuildQueue::applyProduction(int amount) {
         return std::nullopt;
     }
     accumulated_ += amount;
-    const BuildQueueItem item = queue_.front();
-    if (accumulated_ >= buildingCost(item.type)) {
+    const auto &item = queue_.front();
+    if (accumulated_ >= item.productionCost) {
+        auto building = item.factory(item.targetRow, item.targetCol);
         queue_.pop();
         accumulated_ = 0;
-        switch (item.type) {
-        case BuildingType::Farm:
-            return makeFarm(item.targetRow, item.targetCol);
-        case BuildingType::Mine:
-            return makeMine(item.targetRow, item.targetCol);
-        case BuildingType::Market:
-            return makeMarket(item.targetRow, item.targetCol);
-        }
+        return building;
     }
     return std::nullopt;
 }

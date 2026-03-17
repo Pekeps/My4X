@@ -12,10 +12,10 @@ TEST(BuildQueueTest, IsEmptyInitially) {
 
 TEST(BuildQueueTest, EnqueueMakesNonEmpty) {
     BuildQueue bq;
-    bq.enqueue(BuildingType::Farm, 1, 2);
+    bq.enqueue(makeFarm, 1, 2);
     EXPECT_FALSE(bq.isEmpty());
     ASSERT_TRUE(bq.currentItem().has_value());
-    EXPECT_EQ(bq.currentItem()->type, BuildingType::Farm);
+    EXPECT_EQ(bq.currentItem()->name, "Farm");
     EXPECT_EQ(bq.currentItem()->targetRow, 1);
     EXPECT_EQ(bq.currentItem()->targetCol, 2);
 }
@@ -23,7 +23,7 @@ TEST(BuildQueueTest, EnqueueMakesNonEmpty) {
 TEST(BuildQueueTest, ApplyProductionPartialDoesNotComplete) {
     BuildQueue bq;
     // Farm costs 20 production
-    bq.enqueue(BuildingType::Farm, 0, 0);
+    bq.enqueue(makeFarm, 0, 0);
     auto result = bq.applyProduction(5);
     EXPECT_FALSE(result.has_value());
     EXPECT_EQ(bq.accumulatedProduction(), 5);
@@ -33,7 +33,7 @@ TEST(BuildQueueTest, ApplyProductionPartialDoesNotComplete) {
 TEST(BuildQueueTest, ApplyProductionCompletesBuilding) {
     BuildQueue bq;
     // Farm costs 20 production
-    bq.enqueue(BuildingType::Farm, 3, 4);
+    bq.enqueue(makeFarm, 3, 4);
     // Apply in two steps
     auto partial = bq.applyProduction(15);
     EXPECT_FALSE(partial.has_value());
@@ -52,12 +52,12 @@ TEST(BuildQueueTest, ApplyProductionOnEmptyQueueReturnsNullopt) {
 
 TEST(BuildQueueTest, CancelRemovesFrontItem) {
     BuildQueue bq;
-    bq.enqueue(BuildingType::Mine, 0, 0);
-    bq.enqueue(BuildingType::Market, 1, 1);
+    bq.enqueue(makeMine, 0, 0);
+    bq.enqueue(makeMarket, 1, 1);
     bq.applyProduction(5);
     bq.cancel();
     ASSERT_TRUE(bq.currentItem().has_value());
-    EXPECT_EQ(bq.currentItem()->type, BuildingType::Market);
+    EXPECT_EQ(bq.currentItem()->name, "Market");
     EXPECT_EQ(bq.accumulatedProduction(), 0);
 }
 
@@ -70,14 +70,14 @@ TEST(BuildQueueTest, CancelOnEmptyQueueIsNoOp) {
 TEST(BuildQueueTest, TurnsRemainingFarm) {
     BuildQueue bq;
     // Farm costs 20, productionPerTurn=5 => ceil((20-0)/5)=4 turns
-    bq.enqueue(BuildingType::Farm, 0, 0);
+    bq.enqueue(makeFarm, 0, 0);
     EXPECT_EQ(bq.turnsRemaining(5), 4);
 }
 
 TEST(BuildQueueTest, TurnsRemainingWithAccumulated) {
     BuildQueue bq;
     // Mine costs 10, after 3 accumulated => ceil((10-3)/5)=ceil(7/5)=2 turns
-    bq.enqueue(BuildingType::Mine, 0, 0);
+    bq.enqueue(makeMine, 0, 0);
     bq.applyProduction(3);
     EXPECT_EQ(bq.turnsRemaining(5), 2);
 }
@@ -89,14 +89,14 @@ TEST(BuildQueueTest, TurnsRemainingOnEmptyQueueIsZero) {
 
 TEST(BuildQueueTest, TurnsRemainingWithZeroProductionIsZero) {
     BuildQueue bq;
-    bq.enqueue(BuildingType::Market, 0, 0);
+    bq.enqueue(makeMarket, 0, 0);
     EXPECT_EQ(bq.turnsRemaining(0), 0);
 }
 
 TEST(BuildQueueTest, MineCompletesAtCorrectCost) {
     BuildQueue bq;
     // Mine costs 10 production
-    bq.enqueue(BuildingType::Mine, 2, 3);
+    bq.enqueue(makeMine, 2, 3);
     auto partial = bq.applyProduction(9);
     EXPECT_FALSE(partial.has_value());
     auto completed = bq.applyProduction(1);
@@ -108,7 +108,7 @@ TEST(BuildQueueTest, MineCompletesAtCorrectCost) {
 TEST(BuildQueueTest, MarketCompletesAtCorrectCost) {
     BuildQueue bq;
     // Market costs 30 production
-    bq.enqueue(BuildingType::Market, 5, 6);
+    bq.enqueue(makeMarket, 5, 6);
     auto partial = bq.applyProduction(29);
     EXPECT_FALSE(partial.has_value());
     auto completed = bq.applyProduction(1);
@@ -119,18 +119,18 @@ TEST(BuildQueueTest, MarketCompletesAtCorrectCost) {
 
 TEST(BuildQueueTest, AccumulatedResetAfterCompletion) {
     BuildQueue bq;
-    bq.enqueue(BuildingType::Mine, 0, 0);
+    bq.enqueue(makeMine, 0, 0);
     bq.applyProduction(10); // completes mine
     EXPECT_EQ(bq.accumulatedProduction(), 0);
 }
 
 TEST(BuildQueueTest, MultipleItemsInQueue) {
     BuildQueue bq;
-    bq.enqueue(BuildingType::Farm, 0, 0);
-    bq.enqueue(BuildingType::Mine, 1, 1);
+    bq.enqueue(makeFarm, 0, 0);
+    bq.enqueue(makeMine, 1, 1);
     // Complete the farm (costs 20)
     bq.applyProduction(20);
     ASSERT_FALSE(bq.isEmpty());
     ASSERT_TRUE(bq.currentItem().has_value());
-    EXPECT_EQ(bq.currentItem()->type, BuildingType::Mine);
+    EXPECT_EQ(bq.currentItem()->name, "Mine");
 }
