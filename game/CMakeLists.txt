@@ -1,6 +1,7 @@
 add_library(my4x_game STATIC
     src/GameState.cpp
     src/Tile.cpp
+    src/TileRegistry.cpp
     src/Map.cpp
     src/Unit.cpp
     src/Warrior.cpp
