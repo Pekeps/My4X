@@ -1,9 +1,11 @@
 add_library(my4x_engine STATIC
     src/Window.cpp
+    src/MapRenderer.cpp
+    src/Camera.cpp
 )
 
 target_include_directories(my4x_engine PUBLIC include)
-target_link_libraries(my4x_engine PUBLIC raylib)
+target_link_libraries(my4x_engine PUBLIC raylib my4x_game)
 
 if(MSVC)
     target_compile_options(my4x_engine PRIVATE /W4)

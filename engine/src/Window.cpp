@@ -17,7 +17,7 @@ bool isRunning() { return !WindowShouldClose(); }
 
 void beginFrame() {
     BeginDrawing();
-    ClearBackground(BLACK);
+    ClearBackground(WHITE);
 }
 
 void endFrame() { EndDrawing(); }
