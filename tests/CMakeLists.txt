@@ -2,6 +2,7 @@ add_executable(my4x_tests
     game/test_game_state.cpp
     game/test_terrain.cpp
     game/test_unit.cpp
+    game/test_resource.cpp
     engine/test_hex_grid.cpp
 )
 
