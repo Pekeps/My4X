@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-const int SCREEN_WIDTH = 800;
-const int SCREEN_HEIGHT = 600;
+const int SCREEN_WIDTH = 1920;
+const int SCREEN_HEIGHT = 1080;
 
 const int MAP_ROWS = 30;
 const int MAP_COLS = 12;
@@ -48,8 +48,8 @@ int main() {
         // HUD drawn in 2D on top of the 3D scene.
         std::string turnText = "My4X - Turn " + std::to_string(state.getTurn());
         DrawText(turnText.c_str(), HUD_TEXT_X, HUD_TEXT_Y, HUD_TEXT_SIZE, RAYWHITE);
-        DrawText("WASD: pan | Q/E: rotate | Scroll: zoom | SPACE: next turn",
-                 HUD_TEXT_X, HUD_HINT_Y, HUD_HINT_SIZE, GRAY);
+        DrawText("WASD: pan | Q/E: rotate | Scroll: zoom | SPACE: next turn", HUD_TEXT_X, HUD_HINT_Y, HUD_HINT_SIZE,
+                 GRAY);
 
         if (IsKeyPressed(KEY_SPACE)) {
             state.nextTurn();

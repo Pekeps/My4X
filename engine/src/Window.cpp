@@ -7,6 +7,7 @@ namespace engine::window {
 const int DEFAULT_FPS = 60;
 
 void init(int width, int height, const std::string &title) {
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(width, height, title.c_str());
     SetTargetFPS(DEFAULT_FPS);
 }

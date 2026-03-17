@@ -18,10 +18,9 @@ class Camera {
     [[nodiscard]] Camera3D raw() const;
 
   private:
-    Vector3 target_;   // Point the camera looks at (on the XZ plane).
-    float distance_;   // Distance from target.
-    float angle_;      // Rotation around the Y axis in radians.
-    float pitch_;      // Tilt angle from horizontal in radians.
+    Vector3 target_; // Point the camera looks at (on the XZ plane).
+    float distance_; // Distance from target.
+    float angle_;    // Rotation around the Y axis in radians.
 };
 
 } // namespace engine
