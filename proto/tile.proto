@@ -1,0 +1,13 @@
+syntax = "proto3";
+package game_proto;
+enum TerrainType {
+  PLAINS = 0;
+  HILLS = 1;
+  FOREST = 2;
+  WATER = 3;
+}
+message Tile {
+  int32 row = 1;
+  int32 col = 2;
+  TerrainType terrain = 3;
+}

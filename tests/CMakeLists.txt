@@ -6,6 +6,7 @@ add_executable(my4x_tests
     game/test_resource.cpp
     game/test_building.cpp
     game/test_city.cpp
+    game/test_serialization.cpp
     engine/test_hex_grid.cpp
 )
 

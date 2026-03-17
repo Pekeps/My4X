@@ -1,0 +1,15 @@
+syntax = "proto3";
+import "map.proto";
+import "city.proto";
+import "building.proto";
+import "unit.proto";
+import "resource.proto";
+package game_proto;
+message GameState {
+  int32 turn = 1;
+  Map map = 2;
+  repeated City cities = 3;
+  repeated Building buildings = 4;
+  repeated Unit units = 5;
+  Resource faction_resources = 6;
+}

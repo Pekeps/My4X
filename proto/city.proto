@@ -1,0 +1,12 @@
+syntax = "proto3";
+package game_proto;
+message City {
+  uint32 id = 1;
+  string name = 2;
+  int32 center_row = 3;
+  int32 center_col = 4;
+  int32 faction_id = 5;
+  int32 population = 6;
+  repeated int32 tile_rows = 7;
+  repeated int32 tile_cols = 8;
+}

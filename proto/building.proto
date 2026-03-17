@@ -1,0 +1,11 @@
+syntax = "proto3";
+import "resource.proto";
+package game_proto;
+message Building {
+  uint32 id = 1;
+  string name = 2;
+  repeated int32 tile_rows = 3;
+  repeated int32 tile_cols = 4;
+  Resource yield_per_turn = 5;
+  Resource construction_cost = 6;
+}
