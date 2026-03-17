@@ -33,9 +33,7 @@ int BuildQueue::turnsRemaining(int productionPerTurn) const {
     return (cost - accumulated_ + productionPerTurn - 1) / productionPerTurn;
 }
 
-int BuildQueue::accumulatedProduction() const {
-    return accumulated_;
-}
+int BuildQueue::accumulatedProduction() const { return accumulated_; }
 
 std::optional<Building> BuildQueue::applyProduction(int amount) {
     if (queue_.empty()) {
@@ -65,8 +63,6 @@ void BuildQueue::cancel() {
     }
 }
 
-bool BuildQueue::isEmpty() const {
-    return queue_.empty();
-}
+bool BuildQueue::isEmpty() const { return queue_.empty(); }
 
 } // namespace game
