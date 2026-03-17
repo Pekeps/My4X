@@ -8,7 +8,7 @@
 
 namespace engine {
 
-const float DEFAULT_DISTANCE = 20.0F;
+const float DEFAULT_DISTANCE = 30.0F;
 const float DEFAULT_ANGLE = 0.0F;
 const float DEFAULT_FOV = 45.0F;
 
@@ -16,15 +16,22 @@ const float PAN_SPEED = 15.0F;
 const float ROTATE_SPEED = 2.0F;
 const float ZOOM_SPEED = 2.0F;
 const float MIN_DISTANCE = 5.0F;
-const float MAX_DISTANCE = 50.0F;
+const float MAX_DISTANCE = 60.0F;
 
 // Pitch range: lerped based on zoom distance.
 // At MIN_DISTANCE (fully zoomed in): max tilt (looking at an angle).
 // At MAX_DISTANCE (fully zoomed out): top-down view.
-const float MIN_PITCH = 0.6F;  // ~34 degrees from horizontal (max tilt when zoomed in)
-const float MAX_PITCH = 1.55F; // ~89 degrees from horizontal (nearly top-down when zoomed out)
+const float MIN_PITCH_AT_DISTANCE = 20.0F; // ~34 degrees from horizontal (max tilt when zoomed in)
+const float MIN_PITCH = 0.6F;              // ~34 degrees from horizontal (max tilt when zoomed in)
+const float MAX_PITCH = 1.55F;             // ~89 degrees from horizontal (nearly top-down when zoomed out)
 
-Camera::Camera() : target_({.x = 0.0F, .y = 0.0F, .z = 0.0F}), distance_(DEFAULT_DISTANCE), angle_(DEFAULT_ANGLE) {}
+const float INIT_CAMERA_X = 10.0F;
+const float INIT_CAMERA_Y = 0.0F;
+const float INIT_CAMERA_Z = 10.0F;
+
+Camera::Camera()
+    : target_({.x = INIT_CAMERA_X, .y = INIT_CAMERA_Y, .z = INIT_CAMERA_Z}), distance_(DEFAULT_DISTANCE),
+      angle_(DEFAULT_ANGLE) {}
 
 void Camera::update() {
     float deltaTime = GetFrameTime();
@@ -60,7 +67,7 @@ void Camera::update() {
 Camera3D Camera::raw() const {
     // Pitch lerps from max tilt to top-down only when zooming OUT past default distance.
     // Zooming in closer than default keeps max tilt.
-    float zoomFactor = (distance_ - DEFAULT_DISTANCE) / (MAX_DISTANCE - DEFAULT_DISTANCE);
+    float zoomFactor = (distance_ - MIN_PITCH_AT_DISTANCE) / (MAX_DISTANCE - MIN_PITCH_AT_DISTANCE);
     zoomFactor = std::clamp(zoomFactor, 0.0F, 1.0F);
     float pitch = Lerp(MIN_PITCH, MAX_PITCH, zoomFactor);
 

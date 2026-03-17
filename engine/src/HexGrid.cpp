@@ -29,16 +29,52 @@ Vector3 tileCenter(int row, int col) {
 }
 
 std::array<Vector3, HEX_VERTEX_COUNT> hexVertices(Vector3 center) {
-    std::array<Vector3, HEX_VERTEX_COUNT> verts{};
+    std::array<Vector3, HEX_VERTEX_COUNT> verticies{};
     for (int i = 0; i < HEX_VERTEX_COUNT; ++i) {
         float angle = (START_ANGLE_DEGREES + (static_cast<float>(i) * DEGREES_PER_SIDE)) * DEG_TO_RAD;
-        verts[i] = {
+        verticies.at(i) = {
             .x = center.x + (HEX_RADIUS * cosf(angle)),
             .y = 0.0F,
             .z = center.z + (HEX_RADIUS * sinf(angle)),
         };
     }
-    return verts;
+    return verticies;
+}
+
+std::optional<TileCoord> worldToTile(float worldX, float worldZ, int mapHeight, int mapWidth) {
+    // Approximate row/col from world position, then check neighbors
+    // to find the closest hex center (brute-force but reliable for odd-r offset grids).
+    int approxRow = static_cast<int>(std::round(worldZ / HEX_VERTICAL_SPACING));
+    int approxCol = static_cast<int>(std::round(worldX / HEX_HORIZONTAL_SPACING));
+
+    int bestRow = -1;
+    int bestCol = -1;
+    float bestDist = std::numeric_limits<float>::max();
+
+    // Check a small neighborhood around the approximation.
+    for (int row = approxRow - 1; row <= approxRow + 1; ++row) {
+        for (int col = approxCol - 1; col <= approxCol + 1; ++col) {
+            if (row < 0 || row >= mapHeight || col < 0 || col >= mapWidth) {
+                continue;
+            }
+            Vector3 center = tileCenter(row, col);
+            float diffX = worldX - center.x;
+            float diffZ = worldZ - center.z;
+            float dist = (diffX * diffX) + (diffZ * diffZ);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestRow = row;
+                bestCol = col;
+            }
+        }
+    }
+
+    // Only accept if the point is within one hex radius of the closest center.
+    if (bestRow >= 0 && bestDist <= (HEX_RADIUS * HEX_RADIUS)) {
+        return TileCoord{.row = bestRow, .col = bestCol};
+    }
+
+    return std::nullopt;
 }
 
 } // namespace engine::hex

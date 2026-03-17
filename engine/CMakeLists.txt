@@ -4,6 +4,7 @@ add_library(my4x_engine STATIC
     src/MapRenderer.cpp
     src/UnitRenderer.cpp
     src/Camera.cpp
+    src/Input.cpp
 )
 
 target_include_directories(my4x_engine PUBLIC include)
