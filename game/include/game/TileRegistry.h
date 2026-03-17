@@ -1,20 +1,15 @@
 #pragma once
 
+#include "game/Building.h"
+#include "game/City.h"
 #include "game/Unit.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <unordered_map>
 #include <vector>
 
 namespace game {
-
-/// Unique identifier for a city entity.
-using CityId = std::uint32_t;
-
-/// Unique identifier for a building entity.
-using BuildingId = std::uint32_t;
 
 /// Spatial registry that tracks what occupies each map tile.
 ///

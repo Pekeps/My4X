@@ -10,6 +10,9 @@ City::City(std::string name, int centerRow, int centerCol, int factionId)
     tiles_.emplace(centerRow_, centerCol_);
 }
 
+CityId City::id() const { return id_; }
+void City::setId(CityId newId) { id_ = newId; }
+
 const std::string &City::name() const { return name_; }
 int City::centerRow() const { return centerRow_; }
 int City::centerCol() const { return centerCol_; }

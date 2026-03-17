@@ -14,7 +14,7 @@ test: build
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
 
 lint: configure
-	clang-tidy -p $(BUILD_DIR) $(SOURCES)
+	run-clang-tidy -p $(BUILD_DIR) $(SOURCES)
 
 format:
 	clang-format -i $(SOURCES)

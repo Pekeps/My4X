@@ -3,11 +3,13 @@
 #include "game/Resource.h"
 #include "game/TerrainType.h"
 
+#include <cstdint>
 #include <set>
 #include <string>
-#include <utility>
 
 namespace game {
+
+using BuildingId = std::uint32_t;
 
 /// Coordinate pair for a hex tile.
 struct TileCoord {
@@ -28,6 +30,9 @@ class Building {
     Building(std::string name, Resource yieldPerTurn, Resource constructionCost, std::set<TileCoord> occupiedTiles,
              std::set<TerrainType> allowedTerrains = {});
 
+    [[nodiscard]] BuildingId id() const;
+    void setId(BuildingId newId);
+
     [[nodiscard]] const std::string &name() const;
     [[nodiscard]] const Resource &yieldPerTurn() const;
     [[nodiscard]] const Resource &constructionCost() const;
@@ -39,6 +44,7 @@ class Building {
     [[nodiscard]] bool canBuildOn(TerrainType terrain) const;
 
   private:
+    BuildingId id_ = 0;
     std::string name_;
     Resource yieldPerTurn_;
     Resource constructionCost_;

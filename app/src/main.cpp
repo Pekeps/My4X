@@ -4,14 +4,11 @@
 #include "engine/UnitRenderer.h"
 #include "engine/Window.h"
 #include "game/GameState.h"
-#include "game/Map.h"
 #include "game/Warrior.h"
 
 #include "raylib.h"
 
-#include <memory>
 #include <string>
-#include <vector>
 
 const int SCREEN_WIDTH = 1920;
 const int SCREEN_HEIGHT = 1080;
@@ -30,11 +27,8 @@ const int NO_SELECTION = -1;
 int main() {
     engine::window::init(SCREEN_WIDTH, SCREEN_HEIGHT, "My4X");
 
-    game::GameState state;
-    game::Map map(MAP_ROWS, MAP_COLS);
+    game::GameState state(MAP_ROWS, MAP_COLS);
     engine::Camera camera;
-
-    std::vector<std::unique_ptr<game::Unit>> units;
 
     int selectedUnit = NO_SELECTION;
 
@@ -49,8 +43,8 @@ int main() {
         engine::window::beginFrame();
 
         BeginMode3D(cam);
-        engine::drawMap(map, hoveredTile);
-        engine::drawUnits(units, selectedUnit);
+        engine::drawMap(state.map(), hoveredTile);
+        engine::drawUnits(state.units(), selectedUnit);
         EndMode3D();
 
         // HUD
@@ -59,7 +53,7 @@ int main() {
         DrawText("LMB: select/move | RMB: deselect | SPACE: next turn", HUD_TEXT_X, HUD_HINT_Y, HUD_HINT_SIZE, GRAY);
 
         if (selectedUnit != NO_SELECTION) {
-            const auto &unit = units.at(selectedUnit);
+            const auto &unit = state.units().at(selectedUnit);
             std::string unitInfo = unit->name() + " | HP: " + std::to_string(unit->health()) +
                                    " | Moves: " + std::to_string(unit->movementRemaining());
             DrawText(unitInfo.c_str(), HUD_TEXT_X, HUD_HINT_Y + HUD_HINT_SIZE, HUD_HINT_SIZE, YELLOW);
@@ -68,7 +62,7 @@ int main() {
         if (IsKeyPressed(KEY_SPACE)) {
             state.nextTurn();
             // Reset movement for all units at start of new turn.
-            for (auto &unit : units) {
+            for (auto &unit : state.units()) {
                 unit->resetMovement();
             }
         }

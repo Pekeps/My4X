@@ -1,14 +1,20 @@
 #pragma once
 
+#include <cstdint>
 #include <set>
 #include <string>
 #include <utility>
 
 namespace game {
 
+using CityId = std::uint32_t;
+
 class City {
   public:
     City(std::string name, int centerRow, int centerCol, int factionId = 0);
+
+    [[nodiscard]] CityId id() const;
+    void setId(CityId newId);
 
     [[nodiscard]] const std::string &name() const;
     [[nodiscard]] int centerRow() const;
@@ -29,6 +35,7 @@ class City {
     [[nodiscard]] bool containsTile(int row, int col) const;
 
   private:
+    CityId id_ = 0;
     std::string name_;
     int centerRow_;
     int centerCol_;
