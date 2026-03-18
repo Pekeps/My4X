@@ -35,10 +35,12 @@ class GameState {
     // -- Map -----------------------------------------------------------
 
     [[nodiscard]] const Map &map() const;
+    [[nodiscard]] Map &mutableMap();
 
     // -- TileRegistry --------------------------------------------------
 
     [[nodiscard]] const TileRegistry &registry() const;
+    [[nodiscard]] TileRegistry &mutableRegistry();
 
     // -- Cities --------------------------------------------------------
 
@@ -46,11 +48,19 @@ class GameState {
     void removeCity(CityId id);
     [[nodiscard]] const std::vector<City> &cities() const;
 
+    /// Add a city preserving its existing ID (for deserialization).
+    void restoreCity(City city);
+    void setNextCityId(CityId id);
+
     // -- Buildings -----------------------------------------------------
 
     BuildingId addBuilding(Building building);
     void removeBuilding(BuildingId id);
     [[nodiscard]] const std::vector<Building> &buildings() const;
+
+    /// Add a building preserving its existing ID (for deserialization).
+    void restoreBuilding(Building building);
+    void setNextBuildingId(BuildingId id);
 
     // -- Units ---------------------------------------------------------
 
@@ -64,6 +74,10 @@ class GameState {
 
     [[nodiscard]] const Resource &factionResources() const;
     [[nodiscard]] Resource &factionResources();
+
+    void setTurn(int turn);
+    [[nodiscard]] CityId nextCityId() const;
+    [[nodiscard]] BuildingId nextBuildingId() const;
 
   private:
     int turn_ = 1;

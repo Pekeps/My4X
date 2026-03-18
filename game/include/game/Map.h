@@ -13,6 +13,7 @@ class Map {
     Map(int height, int width, std::uint64_t seed);
 
     [[nodiscard]] const Tile &tile(int row, int col) const;
+    [[nodiscard]] Tile &tile(int row, int col);
     [[nodiscard]] int width() const;
     [[nodiscard]] int height() const;
 

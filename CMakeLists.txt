@@ -22,6 +22,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(raylib)
 
 add_subdirectory(engine)
+add_subdirectory(proto)
 add_subdirectory(game)
 add_subdirectory(app)
 

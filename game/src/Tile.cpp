@@ -10,4 +10,6 @@ int Tile::row() const { return row_; }
 
 TerrainType Tile::terrainType() const { return terrain_; }
 
+void Tile::setTerrainType(TerrainType terrain) { terrain_ = terrain; }
+
 } // namespace game

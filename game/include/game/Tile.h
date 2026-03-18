@@ -11,6 +11,7 @@ class Tile {
     [[nodiscard]] int row() const;
     [[nodiscard]] int col() const;
     [[nodiscard]] TerrainType terrainType() const;
+    void setTerrainType(TerrainType terrain);
 
   private:
     int row_;
