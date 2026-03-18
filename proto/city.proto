@@ -1,5 +1,13 @@
 syntax = "proto3";
 package game_proto;
+
+message BuildQueueItem {
+  string name = 1;
+  int32 production_cost = 2;
+  int32 target_row = 3;
+  int32 target_col = 4;
+}
+
 message City {
   uint32 id = 1;
   string name = 2;
@@ -9,4 +17,6 @@ message City {
   int32 population = 6;
   repeated int32 tile_rows = 7;
   repeated int32 tile_cols = 8;
+  repeated BuildQueueItem build_queue_items = 9;
+  int32 accumulated_production = 10;
 }

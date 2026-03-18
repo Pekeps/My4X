@@ -1,7 +1,8 @@
 syntax = "proto3";
 package game_proto;
 enum UnitType {
-  WARRIOR = 0;
+  UNIT_TYPE_UNSPECIFIED = 0;
+  WARRIOR = 1;
 }
 message Unit {
   uint32 id = 1;

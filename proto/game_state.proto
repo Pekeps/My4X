@@ -12,4 +12,7 @@ message GameState {
   repeated Building buildings = 4;
   repeated Unit units = 5;
   Resource faction_resources = 6;
+  uint32 schema_version = 7;
+  uint32 next_city_id = 8;
+  uint32 next_building_id = 9;
 }

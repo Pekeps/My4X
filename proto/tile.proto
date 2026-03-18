@@ -5,6 +5,7 @@ enum TerrainType {
   HILLS = 1;
   FOREST = 2;
   WATER = 3;
+  MOUNTAIN = 4;
 }
 message Tile {
   int32 row = 1;

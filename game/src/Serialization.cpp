@@ -1,6 +1,7 @@
 #include "game/Serialization.h"
 
 #include "game/Building.h"
+#include "game/BuildQueue.h"
 #include "game/City.h"
 #include "game/Resource.h"
 #include "game/TerrainType.h"
@@ -34,38 +35,78 @@ Resource fromProto(const game_proto::Resource &proto) {
 
 game_proto::TerrainType toProtoTerrain(TerrainType t) {
     switch (t) {
+    case TerrainType::Plains:
+        return game_proto::PLAINS;
     case TerrainType::Hills:
         return game_proto::HILLS;
     case TerrainType::Forest:
         return game_proto::FOREST;
     case TerrainType::Water:
         return game_proto::WATER;
-    case TerrainType::Plains:
     case TerrainType::Mountain:
-    default:
-        return game_proto::PLAINS;
+        return game_proto::MOUNTAIN;
     }
+    throw std::invalid_argument("Unknown TerrainType: " + std::to_string(static_cast<int>(t)));
 }
 
 TerrainType fromProtoTerrain(game_proto::TerrainType t) {
     switch (t) {
+    case game_proto::PLAINS:
+        return TerrainType::Plains;
     case game_proto::HILLS:
         return TerrainType::Hills;
     case game_proto::FOREST:
         return TerrainType::Forest;
     case game_proto::WATER:
         return TerrainType::Water;
-    case game_proto::PLAINS:
+    case game_proto::MOUNTAIN:
+        return TerrainType::Mountain;
     default:
-        return TerrainType::Plains;
+        throw std::invalid_argument("Unknown proto TerrainType: " + std::to_string(static_cast<int>(t)));
     }
 }
+
+game_proto::UnitType toProtoUnitType(const Unit &unit) {
+    if (unit.name() == "Warrior") {
+        return game_proto::WARRIOR;
+    }
+    throw std::invalid_argument("Unknown unit type: " + std::string(unit.name()));
+}
+
+std::unique_ptr<Unit> fromProtoUnitType(game_proto::UnitType type, int row, int col) {
+    switch (type) {
+    case game_proto::WARRIOR:
+        return std::make_unique<Warrior>(row, col);
+    case game_proto::UNIT_TYPE_UNSPECIFIED:
+        throw std::invalid_argument("Cannot deserialize UNIT_TYPE_UNSPECIFIED");
+    default:
+        throw std::invalid_argument("Unknown proto UnitType: " + std::to_string(static_cast<int>(type)));
+    }
+}
+
+BuildingFactory buildingFactoryByName(const std::string &name) {
+    if (name == "Farm") {
+        return makeFarm;
+    }
+    if (name == "Mine") {
+        return makeMine;
+    }
+    if (name == "Market") {
+        return makeMarket;
+    }
+    throw std::invalid_argument("Unknown building type for build queue: " + name);
+}
+
+constexpr uint32_t SCHEMA_VERSION = 1;
 
 } // namespace
 
 std::string serializeGameState(const GameState &state) {
     game_proto::GameState proto;
+    proto.set_schema_version(SCHEMA_VERSION);
     proto.set_turn(state.getTurn());
+    proto.set_next_city_id(state.nextCityId());
+    proto.set_next_building_id(state.nextBuildingId());
 
     // Map
     const Map &m = state.map();
@@ -95,6 +136,17 @@ std::string serializeGameState(const GameState &state) {
             protoCity->add_tile_rows(tRow);
             protoCity->add_tile_cols(tCol);
         }
+
+        // Build queue
+        const BuildQueue &bq = city.buildQueue();
+        protoCity->set_accumulated_production(bq.accumulatedProduction());
+        for (const BuildQueueItem &item : bq.allItems()) {
+            game_proto::BuildQueueItem *protoItem = protoCity->add_build_queue_items();
+            protoItem->set_name(item.name);
+            protoItem->set_production_cost(item.productionCost);
+            protoItem->set_target_row(item.targetRow);
+            protoItem->set_target_col(item.targetCol);
+        }
     }
 
     // Buildings
@@ -108,12 +160,15 @@ std::string serializeGameState(const GameState &state) {
         }
         *protoBuilding->mutable_yield_per_turn() = toProto(building.yieldPerTurn());
         *protoBuilding->mutable_construction_cost() = toProto(building.constructionCost());
+        for (TerrainType terrain : building.allowedTerrains()) {
+            protoBuilding->add_allowed_terrains(toProtoTerrain(terrain));
+        }
     }
 
     // Units
     for (const auto &unit : state.units()) {
         game_proto::Unit *protoUnit = proto.add_units();
-        protoUnit->set_type(game_proto::WARRIOR);
+        protoUnit->set_type(toProtoUnitType(*unit));
         protoUnit->set_row(unit->row());
         protoUnit->set_col(unit->col());
         protoUnit->set_health(unit->health());
@@ -132,43 +187,82 @@ std::string serializeGameState(const GameState &state) {
 }
 
 GameState deserializeGameState(const std::string &data) {
+    if (data.empty()) {
+        throw std::runtime_error("Cannot deserialize empty data");
+    }
+
     game_proto::GameState proto;
     if (!proto.ParseFromString(data)) {
         throw std::runtime_error("Failed to deserialize GameState");
     }
 
-    GameState state(proto.map().height(), proto.map().width());
-
-    // Advance turn counter (starts at 1, so call nextTurn turn-1 times)
-    for (int i = 1; i < proto.turn(); ++i) {
-        state.nextTurn();
+    if (proto.map().height() <= 0 || proto.map().width() <= 0) {
+        throw std::runtime_error("Invalid map dimensions in serialized data");
     }
 
-    // Cities
+    GameState state(proto.map().height(), proto.map().width());
+
+    // Turn
+    state.setTurn(proto.turn());
+
+    // Restore map terrain from proto tiles
+    Map &map = state.mutableMap();
+    for (const game_proto::Tile &protoTile : proto.map().tiles()) {
+        map.tile(protoTile.row(), protoTile.col())
+            .setTerrainType(fromProtoTerrain(protoTile.terrain()));
+    }
+
+    // Cities (restore with original IDs)
     for (const game_proto::City &protoCity : proto.cities()) {
         City city(protoCity.name(), protoCity.center_row(), protoCity.center_col(), protoCity.faction_id());
+        city.setId(protoCity.id());
         city.growPopulation(protoCity.population() - 1);
         for (int i = 0; i < protoCity.tile_rows_size(); ++i) {
             city.addTile(protoCity.tile_rows(i), protoCity.tile_cols(i));
         }
-        state.addCity(std::move(city));
-    }
 
-    // Buildings
+        // Restore build queue
+        BuildQueue &bq = city.buildQueue();
+        for (const game_proto::BuildQueueItem &protoItem : protoCity.build_queue_items()) {
+            BuildQueueItem item;
+            item.name = protoItem.name();
+            item.productionCost = protoItem.production_cost();
+            item.targetRow = protoItem.target_row();
+            item.targetCol = protoItem.target_col();
+            item.factory = buildingFactoryByName(protoItem.name());
+            bq.restoreItem(std::move(item));
+        }
+        bq.setAccumulatedProduction(protoCity.accumulated_production());
+
+        state.restoreCity(std::move(city));
+    }
+    state.setNextCityId(proto.next_city_id());
+
+    // Buildings (restore with original IDs and allowed terrains)
     for (const game_proto::Building &protoBuilding : proto.buildings()) {
         std::set<TileCoord> tiles;
         for (int i = 0; i < protoBuilding.tile_rows_size(); ++i) {
             tiles.insert(TileCoord{.row = protoBuilding.tile_rows(i), .col = protoBuilding.tile_cols(i)});
         }
+        std::set<TerrainType> allowedTerrains;
+        for (int i = 0; i < protoBuilding.allowed_terrains_size(); ++i) {
+            allowedTerrains.insert(fromProtoTerrain(protoBuilding.allowed_terrains(i)));
+        }
         Resource yieldPerTurn = fromProto(protoBuilding.yield_per_turn());
         Resource constructionCost = fromProto(protoBuilding.construction_cost());
-        Building building(protoBuilding.name(), yieldPerTurn, constructionCost, std::move(tiles));
-        state.addBuilding(std::move(building));
+        Building building(protoBuilding.name(), yieldPerTurn, constructionCost, std::move(tiles),
+                          std::move(allowedTerrains));
+        building.setId(protoBuilding.id());
+        state.restoreBuilding(std::move(building));
     }
+    state.setNextBuildingId(proto.next_building_id());
 
-    // Units
+    // Units (restore health and movement)
     for (const game_proto::Unit &protoUnit : proto.units()) {
-        state.addUnit(std::make_unique<Warrior>(protoUnit.row(), protoUnit.col()));
+        auto unit = fromProtoUnitType(protoUnit.type(), protoUnit.row(), protoUnit.col());
+        unit->setHealth(protoUnit.health());
+        unit->setMovementRemaining(protoUnit.movement_remaining());
+        state.addUnit(std::move(unit));
     }
 
     // Faction resources

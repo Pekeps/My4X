@@ -26,6 +26,8 @@ class Unit {
     [[nodiscard]] int movement() const;
     [[nodiscard]] int movementRemaining() const;
     void resetMovement();
+    void setHealth(int health);
+    void setMovementRemaining(int remaining);
 
     [[nodiscard]] const std::string &name() const;
 

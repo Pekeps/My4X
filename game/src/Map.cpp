@@ -45,6 +45,12 @@ const Tile &Map::tile(int row, int col) const {
     return tiles_[row][col];
 }
 
+Tile &Map::tile(int row, int col) {
+    assert(row >= 0 && row < height_);
+    assert(col >= 0 && col < width_);
+    return tiles_[row][col];
+}
+
 int Map::width() const { return width_; }
 
 int Map::height() const { return height_; }

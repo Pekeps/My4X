@@ -4,6 +4,7 @@
 #include <optional>
 #include <queue>
 #include <string>
+#include <vector>
 
 namespace game {
 
@@ -27,6 +28,15 @@ class BuildQueue {
     std::optional<Building> applyProduction(int amount);
     void cancel();
     [[nodiscard]] bool isEmpty() const;
+
+    /// Returns a copy of all queued items (for serialization).
+    [[nodiscard]] std::vector<BuildQueueItem> allItems() const;
+
+    /// Restore a single item to the back of the queue (for deserialization).
+    void restoreItem(BuildQueueItem item);
+
+    /// Set accumulated production directly (for deserialization).
+    void setAccumulatedProduction(int amount);
 
   private:
     std::queue<BuildQueueItem> queue_;

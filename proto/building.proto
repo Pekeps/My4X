@@ -1,5 +1,6 @@
 syntax = "proto3";
 import "resource.proto";
+import "tile.proto";
 package game_proto;
 message Building {
   uint32 id = 1;
@@ -8,4 +9,5 @@ message Building {
   repeated int32 tile_cols = 4;
   Resource yield_per_turn = 5;
   Resource construction_cost = 6;
+  repeated TerrainType allowed_terrains = 7;
 }
