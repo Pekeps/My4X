@@ -15,13 +15,19 @@ void GameState::nextTurn() { ++turn_; }
 
 int GameState::getTurn() const { return turn_; }
 
+void GameState::setTurn(int turn) { turn_ = turn; }
+
 // -- Map ---------------------------------------------------------------
 
 const Map &GameState::map() const { return map_; }
 
+Map &GameState::mutableMap() { return map_; }
+
 // -- TileRegistry ------------------------------------------------------
 
 const TileRegistry &GameState::registry() const { return registry_; }
+
+TileRegistry &GameState::mutableRegistry() { return registry_; }
 
 // -- Cities ------------------------------------------------------------
 
@@ -42,6 +48,18 @@ void GameState::removeCity(CityId id) {
 }
 
 const std::vector<City> &GameState::cities() const { return cities_; }
+
+void GameState::restoreCity(City city) {
+    CityId id = city.id();
+    for (const auto &[tRow, tCol] : city.tiles()) {
+        registry_.registerCity(tRow, tCol, id);
+    }
+    cities_.push_back(std::move(city));
+}
+
+void GameState::setNextCityId(CityId id) { nextCityId_ = id; }
+
+CityId GameState::nextCityId() const { return nextCityId_; }
 
 // -- Buildings ---------------------------------------------------------
 
@@ -70,6 +88,18 @@ void GameState::removeBuilding(BuildingId id) {
 }
 
 const std::vector<Building> &GameState::buildings() const { return buildings_; }
+
+void GameState::restoreBuilding(Building building) {
+    BuildingId id = building.id();
+    for (const auto &coord : building.occupiedTiles()) {
+        registry_.registerBuilding(coord.row, coord.col, id);
+    }
+    buildings_.push_back(std::move(building));
+}
+
+void GameState::setNextBuildingId(BuildingId id) { nextBuildingId_ = id; }
+
+BuildingId GameState::nextBuildingId() const { return nextBuildingId_; }
 
 // -- Units -------------------------------------------------------------
 

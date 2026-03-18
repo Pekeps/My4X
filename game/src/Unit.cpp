@@ -32,6 +32,8 @@ void Unit::takeDamage(int amount) {
 int Unit::movement() const { return movement_; }
 int Unit::movementRemaining() const { return movementRemaining_; }
 void Unit::resetMovement() { movementRemaining_ = movement_; }
+void Unit::setHealth(int health) { health_ = std::max(0, std::min(health, maxHealth_)); }
+void Unit::setMovementRemaining(int remaining) { movementRemaining_ = std::max(0, std::min(remaining, movement_)); }
 
 const std::string &Unit::name() const { return name_; }
 

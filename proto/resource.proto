@@ -1,0 +1,7 @@
+syntax = "proto3";
+package game_proto;
+message Resource {
+  int32 gold = 1;
+  int32 production = 2;
+  int32 food = 3;
+}

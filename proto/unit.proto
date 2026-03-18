@@ -1,0 +1,15 @@
+syntax = "proto3";
+package game_proto;
+enum UnitType {
+  UNIT_TYPE_UNSPECIFIED = 0;
+  WARRIOR = 1;
+}
+message Unit {
+  uint32 id = 1;
+  UnitType type = 2;
+  int32 row = 3;
+  int32 col = 4;
+  int32 health = 5;
+  int32 movement_remaining = 6;
+  int32 faction_id = 7;
+}

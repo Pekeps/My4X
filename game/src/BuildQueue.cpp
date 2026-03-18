@@ -52,4 +52,18 @@ void BuildQueue::cancel() {
 
 bool BuildQueue::isEmpty() const { return queue_.empty(); }
 
+std::vector<BuildQueueItem> BuildQueue::allItems() const {
+    std::vector<BuildQueueItem> result;
+    auto copy = queue_;
+    while (!copy.empty()) {
+        result.push_back(std::move(copy.front()));
+        copy.pop();
+    }
+    return result;
+}
+
+void BuildQueue::restoreItem(BuildQueueItem item) { queue_.push(std::move(item)); }
+
+void BuildQueue::setAccumulatedProduction(int amount) { accumulated_ = amount; }
+
 } // namespace game
