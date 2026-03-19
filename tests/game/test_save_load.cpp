@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 
@@ -185,16 +186,23 @@ TEST(SaveLoadTest, LatestSavePathFindsNewestFile) {
 
     std::filesystem::create_directories("saves");
 
-    // Create two save files with a slight time difference.
+    // Create first save file.
     game::GameState state1(5, 5, 42);
     ASSERT_TRUE(game::saveGame(state1, "saves/savegame_20260101_000000.bin"));
+
+    // Set an older write time on the first file so the second is always newer,
+    // regardless of filesystem timestamp resolution.
+    auto older = std::filesystem::file_time_type::clock::now() - std::chrono::seconds(10);
+    std::filesystem::last_write_time("saves/savegame_20260101_000000.bin", older);
 
     game::GameState state2(5, 5, 42);
     state2.nextTurn();
     ASSERT_TRUE(game::saveGame(state2, "saves/savegame_20260101_000001.bin"));
 
     std::string latest = game::latestSavePath();
-    EXPECT_EQ(latest, "saves/savegame_20260101_000001.bin");
+    // Normalize path separators for cross-platform comparison.
+    std::filesystem::path expected("saves/savegame_20260101_000001.bin");
+    EXPECT_EQ(std::filesystem::path(latest), expected);
 
     // Verify the latest file actually loads the correct state.
     game::GameState loaded = game::loadGame(latest);
