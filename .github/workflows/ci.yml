@@ -7,41 +7,50 @@ on:
     branches: [master]
 
 jobs:
-  build-and-test-linux:
-    runs-on: ubuntu-latest
+  build-and-test:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: windows-latest
+            compiler: msvc
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev libprotobuf-dev protobuf-compiler
 
-      - name: Build
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install protoc -y
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
         run: make build
 
-      - name: Test
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+
+      - name: Test (Linux)
+        if: runner.os == 'Linux'
         run: make test
 
-  build-and-test-windows:
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Install dependencies
-        run: vcpkg install protobuf
-
-      - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-      - name: Build
-        run: cmake --build build
-
-      - name: Test
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
         run: ctest --test-dir build --output-on-failure
 
   lint:
