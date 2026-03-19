@@ -43,7 +43,7 @@ const BuildQueue &City::buildQueue() const { return buildQueue_; }
 int City::growthThreshold(int population) {
     static constexpr int kBaseGrowthThreshold = 10;
     static constexpr int kGrowthPerPopulation = 5;
-    return kBaseGrowthThreshold + kGrowthPerPopulation * population;
+    return kBaseGrowthThreshold + (kGrowthPerPopulation * population);
 }
 
 int City::productionPerTurn() {

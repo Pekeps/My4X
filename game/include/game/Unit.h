@@ -1,12 +1,15 @@
 #pragma once
 
+#include "game/UnitTemplate.h"
+
 #include <string>
 
 namespace game {
 
 class Unit {
   public:
-    Unit(int row, int col, int health, int movement, std::string name);
+    /// Construct a unit at (row, col) whose stats come from the given template.
+    Unit(int row, int col, const UnitTemplate &tmpl);
     virtual ~Unit() = default;
 
     Unit(const Unit &) = default;
@@ -23,6 +26,10 @@ class Unit {
     [[nodiscard]] bool isAlive() const;
     void takeDamage(int amount);
 
+    [[nodiscard]] int attack() const;
+    [[nodiscard]] int defense() const;
+    [[nodiscard]] int attackRange() const;
+
     [[nodiscard]] int movement() const;
     [[nodiscard]] int movementRemaining() const;
     void resetMovement();
@@ -31,14 +38,15 @@ class Unit {
 
     [[nodiscard]] const std::string &name() const;
 
+    /// Return the template that defines this unit's type.
+    [[nodiscard]] const UnitTemplate &unitTemplate() const;
+
   private:
     int row_;
     int col_;
     int health_;
-    int maxHealth_;
-    int movement_;
     int movementRemaining_;
-    std::string name_;
+    const UnitTemplate *template_;
 };
 
 } // namespace game

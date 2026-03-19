@@ -2,6 +2,7 @@
 #include "game/City.h"
 #include "game/GameState.h"
 #include "game/SaveLoad.h"
+#include "game/UnitTypeRegistry.h"
 #include "game/Warrior.h"
 
 #include <gtest/gtest.h>
@@ -32,6 +33,12 @@ class TempDir {
     static inline int counter_ = 0;
 };
 
+game::UnitTypeRegistry makeTestRegistry() {
+    game::UnitTypeRegistry reg;
+    reg.registerDefaults();
+    return reg;
+}
+
 } // namespace
 
 TEST(SaveLoadTest, RoundTripEmptyState) {
@@ -53,30 +60,26 @@ TEST(SaveLoadTest, RoundTripEmptyState) {
 TEST(SaveLoadTest, RoundTripFullState) {
     TempDir dir;
     std::string filepath = dir.file("test.bin");
+    auto reg = makeTestRegistry();
 
     game::GameState state(10, 10, 42);
 
-    // Advance several turns.
     for (int i = 0; i < 5; ++i) {
         state.nextTurn();
     }
 
-    // Add a city.
     game::City city("Rome", 3, 4, 1);
     city.growPopulation(3);
     city.addTile(3, 5);
     state.addCity(std::move(city));
 
-    // Add buildings.
     state.addBuilding(game::makeFarm(5, 5));
     state.addBuilding(game::makeMine(2, 2));
 
-    // Add a unit.
-    auto warrior = std::make_unique<game::Warrior>(7, 7);
+    auto warrior = std::make_unique<game::Warrior>(7, 7, reg);
     warrior->takeDamage(20);
     state.addUnit(std::move(warrior));
 
-    // Set resources.
     state.factionResources().gold = 100;
     state.factionResources().production = 50;
     state.factionResources().food = 25;
@@ -88,31 +91,26 @@ TEST(SaveLoadTest, RoundTripFullState) {
     EXPECT_EQ(loaded.map().height(), 10);
     EXPECT_EQ(loaded.map().width(), 10);
 
-    // Verify terrain matches.
     for (int r = 0; r < 10; ++r) {
         for (int c = 0; c < 10; ++c) {
             EXPECT_EQ(loaded.map().tile(r, c).terrainType(), state.map().tile(r, c).terrainType());
         }
     }
 
-    // Verify city.
     ASSERT_EQ(loaded.cities().size(), 1U);
     EXPECT_EQ(loaded.cities()[0].name(), "Rome");
     EXPECT_EQ(loaded.cities()[0].population(), 4);
     EXPECT_EQ(loaded.cities()[0].centerRow(), 3);
     EXPECT_EQ(loaded.cities()[0].centerCol(), 4);
 
-    // Verify buildings.
     ASSERT_EQ(loaded.buildings().size(), 2U);
     EXPECT_EQ(loaded.buildings()[0].name(), "Farm");
     EXPECT_EQ(loaded.buildings()[1].name(), "Mine");
 
-    // Verify unit.
     ASSERT_EQ(loaded.units().size(), 1U);
     EXPECT_EQ(loaded.units()[0]->name(), "Warrior");
     EXPECT_EQ(loaded.units()[0]->health(), 80);
 
-    // Verify resources.
     EXPECT_EQ(loaded.factionResources().gold, 100);
     EXPECT_EQ(loaded.factionResources().production, 50);
     EXPECT_EQ(loaded.factionResources().food, 25);
@@ -158,19 +156,14 @@ TEST(SaveLoadTest, LoadEmptyFileThrows) {
 TEST(SaveLoadTest, GenerateSavePathFormat) {
     std::string path = game::generateSavePath();
 
-    // Should start with "saves/" and end with ".bin".
     EXPECT_EQ(path.substr(0, 6), "saves/");
     EXPECT_EQ(path.substr(path.size() - 4), ".bin");
 
-    // Should contain "savegame_".
     EXPECT_NE(path.find("savegame_"), std::string::npos);
 }
 
 TEST(SaveLoadTest, LatestSavePathThrowsWhenNoSaves) {
-    // latestSavePath looks in "saves/" relative to cwd.
-    // If that directory does not exist, it should throw.
     TempDir dir;
-    // Change to a directory with no saves/ subfolder — use the temp dir.
     auto original = std::filesystem::current_path();
     std::filesystem::current_path(dir.path());
 
@@ -186,12 +179,9 @@ TEST(SaveLoadTest, LatestSavePathFindsNewestFile) {
 
     std::filesystem::create_directories("saves");
 
-    // Create first save file.
     game::GameState state1(5, 5, 42);
     ASSERT_TRUE(game::saveGame(state1, "saves/savegame_20260101_000000.bin"));
 
-    // Set an older write time on the first file so the second is always newer,
-    // regardless of filesystem timestamp resolution.
     auto older = std::filesystem::file_time_type::clock::now() - std::chrono::seconds(10);
     std::filesystem::last_write_time("saves/savegame_20260101_000000.bin", older);
 
@@ -200,11 +190,9 @@ TEST(SaveLoadTest, LatestSavePathFindsNewestFile) {
     ASSERT_TRUE(game::saveGame(state2, "saves/savegame_20260101_000001.bin"));
 
     std::string latest = game::latestSavePath();
-    // Normalize path separators for cross-platform comparison.
     std::filesystem::path expected("saves/savegame_20260101_000001.bin");
     EXPECT_EQ(std::filesystem::path(latest), expected);
 
-    // Verify the latest file actually loads the correct state.
     game::GameState loaded = game::loadGame(latest);
     EXPECT_EQ(loaded.getTurn(), 2);
 

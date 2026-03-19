@@ -4,9 +4,20 @@
 #include "game/GameState.h"
 #include "game/Resource.h"
 #include "game/Serialization.h"
+#include "game/UnitTypeRegistry.h"
 #include "game/Warrior.h"
 
 #include <gtest/gtest.h>
+
+namespace {
+
+game::UnitTypeRegistry makeTestRegistry() {
+    game::UnitTypeRegistry reg;
+    reg.registerDefaults();
+    return reg;
+}
+
+} // namespace
 
 TEST(SerializationTest, EmptyGameStateRoundTrip) {
     game::GameState state(5, 5, 42);
@@ -40,7 +51,6 @@ TEST(SerializationTest, MapTerrainRoundTrip) {
 }
 
 TEST(SerializationTest, AllTerrainTypesRoundTrip) {
-    // Use a seed known to produce all 5 terrain types in a 10x10 map
     game::GameState state(10, 10, 99);
 
     bool hasPlains = false, hasHills = false, hasForest = false, hasWater = false, hasMountain = false;
@@ -85,22 +95,18 @@ TEST(SerializationTest, AllTerrainTypesRoundTrip) {
 TEST(SerializationTest, GameStateWithCityBuildingResourcesRoundTrip) {
     game::GameState state(10, 10, 42);
 
-    // Add a city
     game::City city("Rome", 3, 4, 1);
-    city.growPopulation(4); // population becomes 5
+    city.growPopulation(4);
     city.addTile(3, 5);
     city.addTile(4, 4);
     state.addCity(std::move(city));
 
-    // Add a building (Mine restricted to Hills)
     game::Building mine = game::makeMine(2, 2);
     state.addBuilding(std::move(mine));
 
-    // Add a building (Farm, no terrain restriction)
     game::Building farm = game::makeFarm(5, 5);
     state.addBuilding(std::move(farm));
 
-    // Set faction resources
     state.factionResources().gold = 42;
     state.factionResources().production = 10;
     state.factionResources().food = 7;
@@ -108,7 +114,6 @@ TEST(SerializationTest, GameStateWithCityBuildingResourcesRoundTrip) {
     std::string data = game::serializeGameState(state);
     game::GameState restored = game::deserializeGameState(data);
 
-    // City
     ASSERT_EQ(restored.cities().size(), 1U);
     const game::City &restoredCity = restored.cities()[0];
     EXPECT_EQ(restoredCity.name(), "Rome");
@@ -121,7 +126,6 @@ TEST(SerializationTest, GameStateWithCityBuildingResourcesRoundTrip) {
     EXPECT_TRUE(restoredCity.containsTile(4, 4));
     EXPECT_EQ(restoredCity.tiles().size(), 3U);
 
-    // Buildings
     ASSERT_EQ(restored.buildings().size(), 2U);
     const game::Building &restoredMine = restored.buildings()[0];
     EXPECT_EQ(restoredMine.name(), "Mine");
@@ -135,7 +139,6 @@ TEST(SerializationTest, GameStateWithCityBuildingResourcesRoundTrip) {
     EXPECT_TRUE(restoredFarm.canBuildOn(game::TerrainType::Hills));
     EXPECT_EQ(restoredFarm.allowedTerrains().size(), 0U);
 
-    // Resources
     EXPECT_EQ(restored.factionResources().gold, 42);
     EXPECT_EQ(restored.factionResources().production, 10);
     EXPECT_EQ(restored.factionResources().food, 7);
@@ -143,13 +146,14 @@ TEST(SerializationTest, GameStateWithCityBuildingResourcesRoundTrip) {
 
 TEST(SerializationTest, UnitRoundTrip) {
     game::GameState state(10, 10, 42);
+    auto reg = makeTestRegistry();
 
-    auto warrior = std::make_unique<game::Warrior>(3, 4);
-    warrior->takeDamage(30);         // health: 100 -> 70
-    warrior->moveTo(4, 4);           // movementRemaining: 2 -> 1
+    auto warrior = std::make_unique<game::Warrior>(3, 4, reg);
+    warrior->takeDamage(30);
+    warrior->moveTo(4, 4);
     state.addUnit(std::move(warrior));
 
-    auto fullHealthWarrior = std::make_unique<game::Warrior>(7, 7);
+    auto fullHealthWarrior = std::make_unique<game::Warrior>(7, 7, reg);
     state.addUnit(std::move(fullHealthWarrior));
 
     std::string data = game::serializeGameState(state);
@@ -187,23 +191,21 @@ TEST(SerializationTest, TurnCounterRoundTrip) {
 TEST(SerializationTest, EntityIdPreservation) {
     game::GameState state(10, 10, 42);
 
-    // Add and remove entities to create non-sequential IDs
     game::City city1("Rome", 1, 1, 0);
     game::City city2("Athens", 5, 5, 0);
-    state.addCity(std::move(city1)); // ID 1
-    state.addCity(std::move(city2)); // ID 2
-    state.removeCity(1);             // Remove Rome, leaves Athens with ID 2
+    state.addCity(std::move(city1));
+    state.addCity(std::move(city2));
+    state.removeCity(1);
 
     game::Building b1 = game::makeFarm(2, 2);
     game::Building b2 = game::makeMarket(3, 3);
-    state.addBuilding(std::move(b1)); // ID 1
-    state.addBuilding(std::move(b2)); // ID 2
-    state.removeBuilding(1);          // Remove farm
+    state.addBuilding(std::move(b1));
+    state.addBuilding(std::move(b2));
+    state.removeBuilding(1);
 
     std::string data = game::serializeGameState(state);
     game::GameState restored = game::deserializeGameState(data);
 
-    // IDs should be preserved
     ASSERT_EQ(restored.cities().size(), 1U);
     EXPECT_EQ(restored.cities()[0].id(), 2U);
     EXPECT_EQ(restored.cities()[0].name(), "Athens");
@@ -212,7 +214,6 @@ TEST(SerializationTest, EntityIdPreservation) {
     EXPECT_EQ(restored.buildings()[0].id(), 2U);
     EXPECT_EQ(restored.buildings()[0].name(), "Market");
 
-    // Next IDs should be correct — new entities won't collide
     game::City city3("Sparta", 8, 8, 0);
     game::CityId newId = restored.addCity(std::move(city3));
     EXPECT_GT(newId, 2U);
@@ -224,7 +225,7 @@ TEST(SerializationTest, BuildQueueRoundTrip) {
     game::City city("Rome", 3, 4, 0);
     city.buildQueue().enqueue(game::makeFarm, 3, 5);
     city.buildQueue().enqueue(game::makeMine, 4, 4);
-    city.buildQueue().applyProduction(8); // Accumulate 8 toward Farm (cost 20)
+    city.buildQueue().applyProduction(8);
     state.addCity(std::move(city));
 
     std::string data = game::serializeGameState(state);
@@ -245,6 +246,7 @@ TEST(SerializationTest, BuildQueueRoundTrip) {
 
 TEST(SerializationTest, TileRegistryRebuiltCorrectly) {
     game::GameState state(10, 10, 42);
+    auto reg = makeTestRegistry();
 
     game::City city("Rome", 3, 4, 0);
     city.addTile(3, 5);
@@ -252,20 +254,17 @@ TEST(SerializationTest, TileRegistryRebuiltCorrectly) {
     state.addCity(std::move(city));
 
     state.addBuilding(game::makeFarm(6, 6));
-    state.addUnit(std::make_unique<game::Warrior>(7, 7));
+    state.addUnit(std::make_unique<game::Warrior>(7, 7, reg));
 
     std::string data = game::serializeGameState(state);
     game::GameState restored = game::deserializeGameState(data);
 
-    // All city tiles should be in the registry
     EXPECT_TRUE(restored.registry().cityAt(3, 4).has_value());
     EXPECT_TRUE(restored.registry().cityAt(3, 5).has_value());
     EXPECT_TRUE(restored.registry().cityAt(4, 4).has_value());
 
-    // Building should be registered
     EXPECT_TRUE(restored.registry().buildingAt(6, 6).has_value());
 
-    // Unit should be registered
     EXPECT_FALSE(restored.registry().unitsAt(7, 7).empty());
 }
 

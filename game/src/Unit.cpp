@@ -2,13 +2,11 @@
 
 #include <algorithm>
 #include <cassert>
-#include <utility>
 
 namespace game {
 
-Unit::Unit(int row, int col, int health, int movement, std::string name)
-    : row_(row), col_(col), health_(health), maxHealth_(health), movement_(movement), movementRemaining_(movement),
-      name_(std::move(name)) {}
+Unit::Unit(int row, int col, const UnitTemplate &tmpl)
+    : row_(row), col_(col), health_(tmpl.maxHealth), movementRemaining_(tmpl.movementRange), template_(&tmpl) {}
 
 int Unit::row() const { return row_; }
 int Unit::col() const { return col_; }
@@ -21,7 +19,7 @@ void Unit::moveTo(int row, int col) {
 }
 
 int Unit::health() const { return health_; }
-int Unit::maxHealth() const { return maxHealth_; }
+int Unit::maxHealth() const { return template_->maxHealth; }
 bool Unit::isAlive() const { return health_ > 0; }
 
 void Unit::takeDamage(int amount) {
@@ -29,12 +27,20 @@ void Unit::takeDamage(int amount) {
     health_ = std::max(0, health_ - amount);
 }
 
-int Unit::movement() const { return movement_; }
-int Unit::movementRemaining() const { return movementRemaining_; }
-void Unit::resetMovement() { movementRemaining_ = movement_; }
-void Unit::setHealth(int health) { health_ = std::max(0, std::min(health, maxHealth_)); }
-void Unit::setMovementRemaining(int remaining) { movementRemaining_ = std::max(0, std::min(remaining, movement_)); }
+int Unit::attack() const { return template_->attack; }
+int Unit::defense() const { return template_->defense; }
+int Unit::attackRange() const { return template_->attackRange; }
 
-const std::string &Unit::name() const { return name_; }
+int Unit::movement() const { return template_->movementRange; }
+int Unit::movementRemaining() const { return movementRemaining_; }
+void Unit::resetMovement() { movementRemaining_ = template_->movementRange; }
+void Unit::setHealth(int health) { health_ = std::max(0, std::min(health, template_->maxHealth)); }
+void Unit::setMovementRemaining(int remaining) {
+    movementRemaining_ = std::max(0, std::min(remaining, template_->movementRange));
+}
+
+const std::string &Unit::name() const { return template_->name; }
+
+const UnitTemplate &Unit::unitTemplate() const { return *template_; }
 
 } // namespace game

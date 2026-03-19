@@ -5,7 +5,7 @@
 #include "game/City.h"
 #include "game/Resource.h"
 #include "game/TerrainType.h"
-#include "game/Warrior.h"
+#include "game/UnitTypeRegistry.h"
 
 #include "game_state.pb.h"
 
@@ -70,13 +70,23 @@ game_proto::UnitType toProtoUnitType(const Unit &unit) {
     if (unit.name() == "Warrior") {
         return game_proto::WARRIOR;
     }
+    if (unit.name() == "Archer") {
+        return game_proto::ARCHER;
+    }
+    if (unit.name() == "Settler") {
+        return game_proto::SETTLER;
+    }
     throw std::invalid_argument("Unknown unit type: " + std::string(unit.name()));
 }
 
-std::unique_ptr<Unit> fromProtoUnitType(game_proto::UnitType type, int row, int col) {
+std::string templateKeyFromProtoType(game_proto::UnitType type) {
     switch (type) {
     case game_proto::WARRIOR:
-        return std::make_unique<Warrior>(row, col);
+        return "Warrior";
+    case game_proto::ARCHER:
+        return "Archer";
+    case game_proto::SETTLER:
+        return "Settler";
     case game_proto::UNIT_TYPE_UNSPECIFIED:
         throw std::invalid_argument("Cannot deserialize UNIT_TYPE_UNSPECIFIED");
     default:
@@ -204,6 +214,10 @@ GameState deserializeGameState(const std::string &data) {
 
     GameState state(proto.map().height(), proto.map().width());
 
+    // Build a unit type registry for unit reconstruction.
+    UnitTypeRegistry unitRegistry;
+    unitRegistry.registerDefaults();
+
     // Turn
     state.setTurn(proto.turn());
 
@@ -262,7 +276,9 @@ GameState deserializeGameState(const std::string &data) {
 
     // Units (restore health and movement)
     for (const game_proto::Unit &protoUnit : proto.units()) {
-        auto unit = fromProtoUnitType(protoUnit.type(), protoUnit.row(), protoUnit.col());
+        std::string key = templateKeyFromProtoType(protoUnit.type());
+        const UnitTemplate &tmpl = unitRegistry.getTemplate(key);
+        auto unit = std::make_unique<Unit>(protoUnit.row(), protoUnit.col(), tmpl);
         unit->setHealth(protoUnit.health());
         unit->setMovementRemaining(protoUnit.movement_remaining());
         state.addUnit(std::move(unit));

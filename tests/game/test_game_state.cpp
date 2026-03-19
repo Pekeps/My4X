@@ -2,6 +2,7 @@
 #include "game/Building.h"
 #include "game/City.h"
 #include "game/Resource.h"
+#include "game/UnitTypeRegistry.h"
 #include "game/Warrior.h"
 
 #include <gtest/gtest.h>
@@ -87,7 +88,9 @@ TEST(GameStateTest, RemoveNonExistentBuildingThrows) {
 
 TEST(GameStateTest, AddUnitRegistersInTileRegistry) {
     game::GameState state(4, 4);
-    auto warrior = std::make_unique<game::Warrior>(1, 1);
+    game::UnitTypeRegistry reg;
+    reg.registerDefaults();
+    auto warrior = std::make_unique<game::Warrior>(1, 1, reg);
     game::Unit *raw = warrior.get();
 
     std::size_t idx = state.addUnit(std::move(warrior));
@@ -101,7 +104,9 @@ TEST(GameStateTest, AddUnitRegistersInTileRegistry) {
 
 TEST(GameStateTest, RemoveUnitUnregistersFromTileRegistry) {
     game::GameState state(4, 4);
-    auto warrior = std::make_unique<game::Warrior>(1, 1);
+    game::UnitTypeRegistry reg;
+    reg.registerDefaults();
+    auto warrior = std::make_unique<game::Warrior>(1, 1, reg);
     state.addUnit(std::move(warrior));
 
     state.removeUnit(0);
