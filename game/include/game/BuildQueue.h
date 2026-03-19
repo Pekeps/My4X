@@ -12,9 +12,9 @@ using BuildingFactory = std::function<Building(int row, int col)>;
 
 struct BuildQueueItem {
     std::string name;
-    int productionCost;
-    int targetRow;
-    int targetCol;
+    int productionCost{};
+    int targetRow{};
+    int targetCol{};
     BuildingFactory factory;
 };
 
