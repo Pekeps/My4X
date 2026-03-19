@@ -151,7 +151,11 @@ TEST(UnitTemplateTest, UnitReferencesTemplate) {
     const auto &tmpl = reg.getTemplate("Archer");
     game::Unit unit(0, 0, tmpl);
 
-    EXPECT_EQ(&unit.unitTemplate(), &tmpl);
+    EXPECT_EQ(unit.unitTemplate().name, tmpl.name);
+    EXPECT_EQ(unit.unitTemplate().maxHealth, tmpl.maxHealth);
+    EXPECT_EQ(unit.unitTemplate().attack, tmpl.attack);
+    EXPECT_EQ(unit.unitTemplate().defense, tmpl.defense);
+    EXPECT_EQ(unit.unitTemplate().attackRange, tmpl.attackRange);
 }
 
 TEST(UnitTemplateTest, AllKeysAreSorted) {

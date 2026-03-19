@@ -46,7 +46,7 @@ class Unit {
     int col_;
     int health_;
     int movementRemaining_;
-    const UnitTemplate *template_;
+    UnitTemplate template_;
 };
 
 } // namespace game
