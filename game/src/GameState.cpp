@@ -49,6 +49,8 @@ void GameState::removeCity(CityId id) {
 
 const std::vector<City> &GameState::cities() const { return cities_; }
 
+std::vector<City> &GameState::mutableCities() { return cities_; }
+
 std::vector<City> &GameState::cities() { return cities_; }
 
 City *GameState::findCity(CityId id) {

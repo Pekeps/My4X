@@ -36,9 +36,16 @@ class City {
     /// Check whether the city occupies the given tile.
     [[nodiscard]] bool containsTile(int row, int col) const;
 
+    [[nodiscard]] int foodSurplus() const;
+    void setFoodSurplus(int surplus);
+    void addFoodSurplus(int amount);
+
     [[nodiscard]] BuildQueue &buildQueue();
     [[nodiscard]] const BuildQueue &buildQueue() const;
     [[nodiscard]] static int productionPerTurn();
+
+    /// Growth threshold: the food surplus needed to grow population by 1.
+    [[nodiscard]] static int growthThreshold(int population);
 
   private:
     CityId id_ = 0;
@@ -49,6 +56,7 @@ class City {
     int population_ = 1;
     std::set<std::pair<int, int>> tiles_;
     BuildQueue buildQueue_;
+    int foodSurplus_ = 0;
 };
 
 } // namespace game

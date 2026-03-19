@@ -47,6 +47,7 @@ class GameState {
     CityId addCity(City city);
     void removeCity(CityId id);
     [[nodiscard]] const std::vector<City> &cities() const;
+    [[nodiscard]] std::vector<City> &mutableCities();
     [[nodiscard]] std::vector<City> &cities();
 
     /// Find a city by ID, or nullptr if not found.

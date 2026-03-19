@@ -33,8 +33,19 @@ const std::set<std::pair<int, int>> &City::tiles() const { return tiles_; }
 
 bool City::containsTile(int row, int col) const { return tiles_.contains({row, col}); }
 
+int City::foodSurplus() const { return foodSurplus_; }
+void City::setFoodSurplus(int surplus) { foodSurplus_ = surplus; }
+void City::addFoodSurplus(int amount) { foodSurplus_ += amount; }
+
 BuildQueue &City::buildQueue() { return buildQueue_; }
 const BuildQueue &City::buildQueue() const { return buildQueue_; }
+
+int City::growthThreshold(int population) {
+    static constexpr int kBaseGrowthThreshold = 10;
+    static constexpr int kGrowthPerPopulation = 5;
+    return kBaseGrowthThreshold + kGrowthPerPopulation * population;
+}
+
 int City::productionPerTurn() {
     static constexpr int kBaseProductionPerTurn = 5;
     return kBaseProductionPerTurn;

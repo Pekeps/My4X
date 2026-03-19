@@ -10,6 +10,7 @@ add_library(my4x_game STATIC
     src/City.cpp
     src/Serialization.cpp
     src/BuildQueue.cpp
+    src/TurnResolver.cpp
     src/SaveLoad.cpp
 )
 

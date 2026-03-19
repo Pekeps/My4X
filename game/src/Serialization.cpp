@@ -137,6 +137,8 @@ std::string serializeGameState(const GameState &state) {
             protoCity->add_tile_cols(tCol);
         }
 
+        protoCity->set_food_surplus(city.foodSurplus());
+
         // Build queue
         const BuildQueue &bq = city.buildQueue();
         protoCity->set_accumulated_production(bq.accumulatedProduction());
@@ -232,6 +234,8 @@ GameState deserializeGameState(const std::string &data) {
             bq.restoreItem(std::move(item));
         }
         bq.setAccumulatedProduction(protoCity.accumulated_production());
+
+        city.setFoodSurplus(protoCity.food_surplus());
 
         state.restoreCity(std::move(city));
     }
