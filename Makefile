@@ -13,7 +13,7 @@ build: configure
 test: build
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
 
-lint: configure
+lint: build
 	run-clang-tidy -p $(BUILD_DIR) $(SOURCES)
 
 format:

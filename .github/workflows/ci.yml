@@ -7,35 +7,42 @@ on:
     branches: [master]
 
 jobs:
-  build-and-test:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            compiler: gcc
-          - os: windows-latest
-            compiler: msvc
-
-    runs-on: ${{ matrix.os }}
+  build-and-test-linux:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev libprotobuf-dev protobuf-compiler
-
-      - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build
         run: make build
 
       - name: Test
         run: make test
+
+  build-and-test-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install dependencies
+        run: vcpkg install protobuf
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
 
   lint:
     runs-on: ubuntu-latest
