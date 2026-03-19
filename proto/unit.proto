@@ -3,6 +3,8 @@ package game_proto;
 enum UnitType {
   UNIT_TYPE_UNSPECIFIED = 0;
   WARRIOR = 1;
+  ARCHER = 2;
+  SETTLER = 3;
 }
 message Unit {
   uint32 id = 1;

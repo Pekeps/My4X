@@ -13,6 +13,7 @@
 #include "game/GameState.h"
 #include "game/SaveLoad.h"
 #include "game/TerrainType.h"
+#include "game/UnitTypeRegistry.h"
 #include "game/Warrior.h"
 
 #include "raylib.h"

@@ -5,6 +5,7 @@ add_library(my4x_game STATIC
     src/Map.cpp
     src/Unit.cpp
     src/Warrior.cpp
+    src/UnitTypeRegistry.cpp
     src/Resource.cpp
     src/Building.cpp
     src/City.cpp

@@ -2,8 +2,7 @@
 
 namespace game {
 
-Warrior::Warrior(int row, int col) : Unit(row, col, DEFAULT_HEALTH, DEFAULT_MOVEMENT, "Warrior") {}
-
-int Warrior::attackPower() const { return attackPower_; }
+Warrior::Warrior(int row, int col, const UnitTypeRegistry &registry)
+    : Unit(row, col, registry.getTemplate("Warrior")) {}
 
 } // namespace game
