@@ -1,4 +1,4 @@
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-pro-type-vararg)
 
 #include "engine/BuildingRenderer.h"
 #include "engine/Camera.h"
@@ -11,6 +11,7 @@
 #include "game/Building.h"
 #include "game/City.h"
 #include "game/GameState.h"
+#include "game/SaveLoad.h"
 #include "game/TerrainType.h"
 #include "game/Warrior.h"
 
@@ -354,6 +355,30 @@ static void processTurn(game::GameState &state) {
     state.factionResources() += totalYield;
 }
 
+// ── Save / Load ─────────────────────────────────────────────────────────
+
+static void handleSaveLoad(game::GameState &state, int &selectedUnit) {
+    if (IsKeyPressed(KEY_F5)) {
+        auto path = game::generateSavePath();
+        if (game::saveGame(state, path)) {
+            TraceLog(LOG_INFO, "Game saved: %s", path.c_str());
+        } else {
+            TraceLog(LOG_ERROR, "Failed to save game");
+        }
+    }
+
+    if (IsKeyPressed(KEY_F9)) {
+        try {
+            auto path = game::latestSavePath();
+            state = game::loadGame(path);
+            selectedUnit = NO_SELECTION;
+            TraceLog(LOG_INFO, "Game loaded: %s", path.c_str());
+        } catch (const std::exception &e) {
+            TraceLog(LOG_ERROR, "Failed to load game: %s", e.what());
+        }
+    }
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {
@@ -410,10 +435,12 @@ int main() {
             }
         }
 
+        handleSaveLoad(state, selectedUnit);
+
         engine::window::endFrame();
     }
 
     engine::window::shutdown();
     return 0;
 }
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-pro-type-vararg)

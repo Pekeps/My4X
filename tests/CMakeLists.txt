@@ -9,6 +9,7 @@ add_executable(my4x_tests
     game/test_serialization.cpp
     game/test_build_queue.cpp
     game/test_turn_resolver.cpp
+    game/test_save_load.cpp
     engine/test_hex_grid.cpp
 )
 

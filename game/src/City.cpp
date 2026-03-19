@@ -40,7 +40,11 @@ void City::addFoodSurplus(int amount) { foodSurplus_ += amount; }
 BuildQueue &City::buildQueue() { return buildQueue_; }
 const BuildQueue &City::buildQueue() const { return buildQueue_; }
 
-int City::growthThreshold(int population) { return 10 + 5 * population; }
+int City::growthThreshold(int population) {
+    static constexpr int kBaseGrowthThreshold = 10;
+    static constexpr int kGrowthPerPopulation = 5;
+    return kBaseGrowthThreshold + kGrowthPerPopulation * population;
+}
 
 int City::productionPerTurn() {
     static constexpr int kBaseProductionPerTurn = 5;
