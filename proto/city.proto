@@ -19,4 +19,5 @@ message City {
   repeated int32 tile_cols = 8;
   repeated BuildQueueItem build_queue_items = 9;
   int32 accumulated_production = 10;
+  int32 food_surplus = 11;
 }

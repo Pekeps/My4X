@@ -47,6 +47,7 @@ class GameState {
     CityId addCity(City city);
     void removeCity(CityId id);
     [[nodiscard]] const std::vector<City> &cities() const;
+    [[nodiscard]] std::vector<City> &mutableCities();
 
     /// Add a city preserving its existing ID (for deserialization).
     void restoreCity(City city);

@@ -1,7 +1,7 @@
 #include "game/Serialization.h"
 
-#include "game/Building.h"
 #include "game/BuildQueue.h"
+#include "game/Building.h"
 #include "game/City.h"
 #include "game/Resource.h"
 #include "game/TerrainType.h"
@@ -137,6 +137,8 @@ std::string serializeGameState(const GameState &state) {
             protoCity->add_tile_cols(tCol);
         }
 
+        protoCity->set_food_surplus(city.foodSurplus());
+
         // Build queue
         const BuildQueue &bq = city.buildQueue();
         protoCity->set_accumulated_production(bq.accumulatedProduction());
@@ -208,8 +210,7 @@ GameState deserializeGameState(const std::string &data) {
     // Restore map terrain from proto tiles
     Map &map = state.mutableMap();
     for (const game_proto::Tile &protoTile : proto.map().tiles()) {
-        map.tile(protoTile.row(), protoTile.col())
-            .setTerrainType(fromProtoTerrain(protoTile.terrain()));
+        map.tile(protoTile.row(), protoTile.col()).setTerrainType(fromProtoTerrain(protoTile.terrain()));
     }
 
     // Cities (restore with original IDs)
@@ -233,6 +234,8 @@ GameState deserializeGameState(const std::string &data) {
             bq.restoreItem(std::move(item));
         }
         bq.setAccumulatedProduction(protoCity.accumulated_production());
+
+        city.setFoodSurplus(protoCity.food_surplus());
 
         state.restoreCity(std::move(city));
     }
