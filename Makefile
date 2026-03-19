@@ -2,7 +2,7 @@ BUILD_DIR := build
 BUILD_TYPE ?= Debug
 SOURCES := $(shell find engine game app -name '*.cpp' -o -name '*.h')
 
-.PHONY: build test lint format format-check clean configure
+.PHONY: build test lint format format-check clean configure ci
 
 configure:
 	cmake -B $(BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
@@ -24,3 +24,32 @@ format-check:
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+# Agent-friendly target: runs format, build, lint, test.
+# Suppresses verbose output; only prints step name + errors on failure, or a summary on success.
+ci:
+	@failed=0; \
+	echo "--- format ---"; \
+	clang-format -i $(SOURCES); \
+	out=$$(clang-format --dry-run --Werror $(SOURCES) 2>&1); \
+	if [ $$? -ne 0 ]; then echo "FAIL: format"; echo "$$out"; failed=1; fi; \
+	\
+	echo "--- build ---"; \
+	out=$$(cmake -B $(BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) 2>&1 && cmake --build $(BUILD_DIR) 2>&1); \
+	if [ $$? -ne 0 ]; then echo "FAIL: build"; echo "$$out" | grep -E "error:|FAILED"; failed=1; fi; \
+	\
+	if [ $$failed -eq 0 ]; then \
+	  echo "--- lint ---"; \
+	  out=$$(run-clang-tidy -p $(BUILD_DIR) $(SOURCES) 2>&1); \
+	  if echo "$$out" | grep -qE "warning:|error:"; then \
+	    echo "FAIL: lint"; echo "$$out" | grep -E "warning:|error:"; failed=1; \
+	  fi; \
+	  \
+	  echo "--- test ---"; \
+	  out=$$(ctest --test-dir $(BUILD_DIR) --output-on-failure 2>&1); \
+	  if [ $$? -ne 0 ]; then echo "FAIL: test"; echo "$$out"; failed=1; \
+	  else echo "$$out" | tail -1; fi; \
+	fi; \
+	\
+	if [ $$failed -ne 0 ]; then echo "=== FAILED ==="; exit 1; \
+	else echo "=== ALL PASSED ==="; fi
