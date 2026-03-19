@@ -1,7 +1,7 @@
 #include "game/Serialization.h"
 
-#include "game/Building.h"
 #include "game/BuildQueue.h"
+#include "game/Building.h"
 #include "game/City.h"
 #include "game/Resource.h"
 #include "game/TerrainType.h"
@@ -208,8 +208,7 @@ GameState deserializeGameState(const std::string &data) {
     // Restore map terrain from proto tiles
     Map &map = state.mutableMap();
     for (const game_proto::Tile &protoTile : proto.map().tiles()) {
-        map.tile(protoTile.row(), protoTile.col())
-            .setTerrainType(fromProtoTerrain(protoTile.terrain()));
+        map.tile(protoTile.row(), protoTile.col()).setTerrainType(fromProtoTerrain(protoTile.terrain()));
     }
 
     // Cities (restore with original IDs)
