@@ -13,13 +13,24 @@ FetchContent_Declare(
     GIT_TAG 5.5
 )
 
+set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_PROTOBUF_BINARIES ON CACHE BOOL "" FORCE)
+set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    protobuf
+    GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
+    GIT_TAG v29.3
+)
+
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG v1.15.2
 )
 
-FetchContent_MakeAvailable(raylib)
+FetchContent_MakeAvailable(raylib protobuf)
+include(${protobuf_SOURCE_DIR}/cmake/protobuf-generate.cmake)
 
 add_subdirectory(engine)
 add_subdirectory(proto)
