@@ -26,8 +26,7 @@ void drawBuildings(const std::vector<game::Building> &buildings) {
         for (const auto &tile : building.occupiedTiles()) {
             Vector3 pos = hex::tileCenter(tile.row, tile.col);
             pos.y = BUILDING_Y_OFFSET;
-            DrawCylinder(pos, BUILDING_RADIUS, BUILDING_RADIUS, BUILDING_HEIGHT, BUILDING_SLICES,
-                         color);
+            DrawCylinder(pos, BUILDING_RADIUS, BUILDING_RADIUS, BUILDING_HEIGHT, BUILDING_SLICES, color);
         }
     }
 }

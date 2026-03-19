@@ -13,8 +13,7 @@ const float CITY_MARKER_RADIUS = 0.25F;
 const float CITY_MARKER_HEIGHT = 0.5F;
 const int CITY_MARKER_SLICES = 8;
 
-void drawCities(const std::vector<game::City> &cities,
-                std::optional<game::CityId> selectedCityId) {
+void drawCities(const std::vector<game::City> &cities, std::optional<game::CityId> selectedCityId) {
     for (const auto &city : cities) {
         const bool selected = selectedCityId && city.id() == *selectedCityId;
         const Color fillColor = selected ? Color{120, 120, 255, 180} : Color{80, 80, 200, 120};
@@ -27,8 +26,8 @@ void drawCities(const std::vector<game::City> &cities,
 
         Vector3 markerPos = hex::tileCenter(city.centerRow(), city.centerCol());
         markerPos.y = CITY_MARKER_Y;
-        DrawCylinder(markerPos, CITY_MARKER_RADIUS, CITY_MARKER_RADIUS, CITY_MARKER_HEIGHT,
-                     CITY_MARKER_SLICES, markerColor);
+        DrawCylinder(markerPos, CITY_MARKER_RADIUS, CITY_MARKER_RADIUS, CITY_MARKER_HEIGHT, CITY_MARKER_SLICES,
+                     markerColor);
     }
 }
 
