@@ -34,7 +34,7 @@ Resource fromProto(const game_proto::Resource &proto) {
 }
 
 game_proto::TerrainType toProtoTerrain(TerrainType t) {
-    switch (t) {
+    switch (t) { // NOLINT(bugprone-branch-clone)
     case TerrainType::Plains:
         return game_proto::PLAINS;
     case TerrainType::Hills:

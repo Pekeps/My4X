@@ -51,6 +51,13 @@ const std::vector<City> &GameState::cities() const { return cities_; }
 
 std::vector<City> &GameState::mutableCities() { return cities_; }
 
+std::vector<City> &GameState::cities() { return cities_; }
+
+City *GameState::findCity(CityId id) {
+    auto iter = std::ranges::find_if(cities_, [id](const City &c) { return c.id() == id; });
+    return iter != cities_.end() ? &*iter : nullptr;
+}
+
 void GameState::restoreCity(City city) {
     CityId id = city.id();
     for (const auto &[tRow, tCol] : city.tiles()) {
