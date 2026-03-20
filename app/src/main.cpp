@@ -6,12 +6,16 @@
 #include "engine/CombatEffects.h"
 #include "engine/CombatLogRenderer.h"
 #include "engine/DiplomacyColors.h"
+#include "engine/EndTurnButton.h"
 #include "engine/FactionColors.h"
 #include "engine/HexGrid.h"
 #include "engine/Input.h"
 #include "engine/MapRenderer.h"
+#include "engine/MenuSystem.h"
 #include "engine/Minimap.h"
 #include "engine/RangeOverlay.h"
+#include "engine/Tooltip.h"
+#include "engine/Transition.h"
 #include "engine/UnitRenderer.h"
 #include "engine/Window.h"
 #include "game/AttackAction.h"
@@ -90,6 +94,12 @@ const Color HUD_ACCENT_COL = {220, 200, 120, 255};
 const Color HUD_DIM_COL = {100, 100, 120, 255};
 
 const int NO_SELECTION = -1;
+
+// ── Unit info panel (left side, when unit selected) ──────────────────────────
+
+const int UNIT_PANEL_X = 14;
+const int UNIT_PANEL_Y = 12;
+const int UNIT_PANEL_W = 340;
 
 // ── Faction list panel (bottom-left) ─────────────────────────────────────────
 
@@ -183,17 +193,176 @@ static void drawProgressBar(int x, int y, int w, int current, int total) {
     DrawText(text.c_str(), x + ((w - textW) / 2), y + 1, PANEL_KEY_SIZE, WHITE);
 }
 
-// ── Top-left HUD ─────────────────────────────────────────────────────────────
+// ── Unit info panel (left side) ─────────────────────────────────────────────
 
-static void drawTopHud(const game::GameState &state, int selectedUnit) {
-    // Determine player faction info.
+static void drawUnitInfoPanel(const game::GameState &state, int selectedUnit) {
+    if (selectedUnit == NO_SELECTION) {
+        return;
+    }
+
+    const auto &unit = state.units().at(selectedUnit);
+    const auto *playerFaction = state.factionRegistry().findFaction(PLAYER_FACTION_ID);
+
+    int contentW = UNIT_PANEL_W - (PANEL_PAD * 2);
+    int x = UNIT_PANEL_X + PANEL_PAD;
+
+    // Measure panel height dynamically.
+    int panelH = PANEL_PAD;          // top padding
+    panelH += PANEL_TITLE_SIZE + 8;  // unit name
+    panelH += 1 + PANEL_SECTION_GAP; // separator
+    if (playerFaction != nullptr) {
+        panelH += PANEL_LINE_H; // faction name line
+    }
+    panelH += PANEL_LINE_H;          // resources
+    panelH += 1 + PANEL_SECTION_GAP; // separator
+    panelH += PANEL_LINE_H * 4;      // HP, ATK/DEF, Moves, XP/Level
+    panelH += PANEL_SECTION_GAP;
+    panelH += 1 + PANEL_SECTION_GAP; // separator
+
+    // Terrain line
+    panelH += PANEL_LINE_H;
+
+    // Faction/diplomacy for the selected unit.
+    const auto *unitFaction = state.factionRegistry().findFaction(unit->factionId());
+    if (unitFaction != nullptr) {
+        panelH += PANEL_LINE_H;
+    }
+
+    panelH += PANEL_SECTION_GAP;
+    panelH += PANEL_LINE_H; // controls hint
+    panelH += PANEL_PAD;    // bottom padding
+
+    // Panel background with border.
+    DrawRectangleRounded({static_cast<float>(UNIT_PANEL_X), static_cast<float>(UNIT_PANEL_Y),
+                          static_cast<float>(UNIT_PANEL_W), static_cast<float>(panelH)},
+                         0.04F, 6, PANEL_BG);
+    DrawRectangleRoundedLines({static_cast<float>(UNIT_PANEL_X), static_cast<float>(UNIT_PANEL_Y),
+                               static_cast<float>(UNIT_PANEL_W), static_cast<float>(panelH)},
+                              0.04F, 6, PANEL_BORDER);
+
+    int y = UNIT_PANEL_Y + PANEL_PAD;
+
+    // ── Unit name ───────────────────────────────────────────────────────
+    DrawText(unit->name().c_str(), x, y, PANEL_TITLE_SIZE, PANEL_TITLE_COL);
+    y += PANEL_TITLE_SIZE + 8;
+
+    drawSeparator(x, y, contentW);
+    y += 1 + PANEL_SECTION_GAP;
+
+    // ── Player faction + resources ──────────────────────────────────────
+    if (playerFaction != nullptr) {
+        std::string factionLabel = "Faction: " + playerFaction->name();
+        Color factionColor = engine::faction_colors::factionColor(playerFaction->type(), playerFaction->colorIndex());
+        DrawText(factionLabel.c_str(), x, y, HUD_TEXT_SIZE, factionColor);
+        y += HUD_LINE_H;
+    }
+
+    // Resources.
+    const game::Resource &res = (playerFaction != nullptr) ? playerFaction->stockpile() : state.factionResources();
+    std::string goldStr = "Gold: " + std::to_string(res.gold);
+    std::string prodStr = "Prod: " + std::to_string(res.production);
+    std::string foodStr = "Food: " + std::to_string(res.food);
+    DrawText(goldStr.c_str(), x, y, HUD_TEXT_SIZE, HUD_ACCENT_COL);
+    DrawText(prodStr.c_str(), x + 110, y, HUD_TEXT_SIZE, HUD_TEXT_COL);
+    DrawText(foodStr.c_str(), x + 220, y, HUD_TEXT_SIZE, Color{120, 200, 100, 255});
+    y += HUD_LINE_H;
+
+    drawSeparator(x, y, contentW);
+    y += 1 + PANEL_SECTION_GAP;
+
+    // ── Unit stats ──────────────────────────────────────────────────────
+    std::string hpStr = "HP    " + std::to_string(unit->health()) + " / " + std::to_string(unit->maxHealth());
+    DrawText(hpStr.c_str(), x, y, PANEL_TEXT_SIZE, PANEL_TEXT_COL);
+
+    // HP bar (small inline bar).
+    int hpBarX = x + contentW - 100;
+    int hpBarW = 100;
+    int hpBarH = 10;
+    int hpBarY = y + 4;
+    DrawRectangle(hpBarX, hpBarY, hpBarW, hpBarH, PROGRESS_BG);
+    if (unit->maxHealth() > 0) {
+        int fillW = std::min(hpBarW, (unit->health() * hpBarW) / unit->maxHealth());
+        Color hpColor = {.r = 70, .g = 200, .b = 90, .a = 255};
+        if (unit->health() * 3 < unit->maxHealth()) {
+            hpColor = {.r = 220, .g = 60, .b = 60, .a = 255}; // low HP = red
+        } else if (unit->health() * 3 < unit->maxHealth() * 2) {
+            hpColor = {.r = 220, .g = 180, .b = 60, .a = 255}; // medium HP = yellow
+        }
+        DrawRectangle(hpBarX, hpBarY, fillW, hpBarH, hpColor);
+    }
+    y += PANEL_LINE_H;
+
+    std::string atkDefStr = "ATK " + std::to_string(unit->attack()) + "    DEF " + std::to_string(unit->defense());
+    if (unit->attackRange() > 1) {
+        atkDefStr += "    Range " + std::to_string(unit->attackRange());
+    }
+    DrawText(atkDefStr.c_str(), x, y, PANEL_TEXT_SIZE, PANEL_TEXT_COL);
+    y += PANEL_LINE_H;
+
+    std::string moveStr =
+        "Moves " + std::to_string(unit->movementRemaining()) + " / " + std::to_string(unit->movement());
+    DrawText(moveStr.c_str(), x, y, PANEL_TEXT_SIZE, PANEL_TEXT_COL);
+    y += PANEL_LINE_H;
+
+    std::string xpStr = "XP " + std::to_string(unit->experience());
+    if (unit->level() > 0) {
+        xpStr += "    Level " + std::to_string(unit->level());
+    }
+    DrawText(xpStr.c_str(), x, y, PANEL_TEXT_SIZE, PANEL_TEXT_COL);
+    y += PANEL_LINE_H;
+
+    y += PANEL_SECTION_GAP;
+    drawSeparator(x, y, contentW);
+    y += 1 + PANEL_SECTION_GAP;
+
+    // ── Terrain info for unit's tile ────────────────────────────────────
+    auto terrain = state.map().tile(unit->row(), unit->col()).terrainType();
+    const auto &terrainProps = game::getTerrainProperties(terrain);
+    std::string terrainStr = "Terrain: " + std::string(game::terrainName(terrain));
+    if (terrainProps.defenseModifier > 0) {
+        terrainStr += "  (Defense +" + std::to_string(terrainProps.defenseModifier) + ")";
+    } else if (terrainProps.defenseModifier < 0) {
+        terrainStr += "  (Defense " + std::to_string(terrainProps.defenseModifier) + ")";
+    }
+    Color terrainColor = PANEL_DIM_COL;
+    if (terrainProps.defenseModifier > 0) {
+        terrainColor = Color{100, 200, 255, 255};
+    } else if (terrainProps.defenseModifier < 0) {
+        terrainColor = Color{255, 140, 100, 255};
+    }
+    DrawText(terrainStr.c_str(), x, y, HUD_TEXT_SIZE, terrainColor);
+    y += PANEL_LINE_H;
+
+    // ── Unit owner faction + diplomacy ──────────────────────────────────
+    if (unitFaction != nullptr) {
+        Color unitFactionColor = engine::faction_colors::factionColor(unitFaction->type(), unitFaction->colorIndex());
+        std::string ownerStr = unitFaction->name();
+        DrawText(ownerStr.c_str(), x, y, HUD_TEXT_SIZE, unitFactionColor);
+
+        if (unit->factionId() != PLAYER_FACTION_ID) {
+            auto relation = state.diplomacy().getRelation(PLAYER_FACTION_ID, unit->factionId());
+            Color dipColor = engine::diplomacy_colors::diplomacyColor(relation);
+            const char *dipLabel = engine::diplomacy_colors::diplomacyLabel(relation);
+            std::string dipStr = std::string("  [") + dipLabel + "]";
+            int nameW = MeasureText(ownerStr.c_str(), HUD_TEXT_SIZE);
+            DrawText(dipStr.c_str(), x + nameW, y, HUD_TEXT_SIZE, dipColor);
+        }
+        y += PANEL_LINE_H;
+    }
+
+    y += PANEL_SECTION_GAP;
+
+    // ── Controls hint ───────────────────────────────────────────────────
+    DrawText("RMB / ESC to deselect", x, y, PANEL_KEY_SIZE, HUD_DIM_COL);
+}
+
+// ── Top-left HUD (when no unit selected — shows faction info + resources) ────
+
+static void drawTopHud(const game::GameState &state) {
     const auto *playerFaction = state.factionRegistry().findFaction(PLAYER_FACTION_ID);
 
     // Background — compute height dynamically.
-    int hudH = 78;
-    if (selectedUnit != NO_SELECTION) {
-        hudH += HUD_LINE_H * 3; // unit info + faction/diplomacy line + terrain defense line
-    }
+    int hudH = 56;
     if (playerFaction != nullptr) {
         hudH += HUD_LINE_H; // faction name line
     }
@@ -203,12 +372,7 @@ static void drawTopHud(const game::GameState &state, int selectedUnit) {
 
     int y = HUD_Y;
 
-    // Turn
-    std::string turnText = "My4X  --  Turn " + std::to_string(state.getTurn());
-    DrawText(turnText.c_str(), HUD_X, y, HUD_TITLE_SIZE, HUD_TITLE_COL);
-    y += HUD_TITLE_SIZE + 6;
-
-    // Player faction name
+    // Player faction name.
     if (playerFaction != nullptr) {
         std::string factionLabel = "Faction: " + playerFaction->name();
         Color factionColor = engine::faction_colors::factionColor(playerFaction->type(), playerFaction->colorIndex());
@@ -216,7 +380,7 @@ static void drawTopHud(const game::GameState &state, int selectedUnit) {
         y += HUD_LINE_H;
     }
 
-    // Resources — use player faction stockpile if available, otherwise legacy.
+    // Resources.
     const game::Resource &res = (playerFaction != nullptr) ? playerFaction->stockpile() : state.factionResources();
     std::string goldStr = "Gold: " + std::to_string(res.gold);
     std::string prodStr = "Prod: " + std::to_string(res.production);
@@ -226,59 +390,8 @@ static void drawTopHud(const game::GameState &state, int selectedUnit) {
     DrawText(foodStr.c_str(), HUD_X + 220, y, HUD_TEXT_SIZE, Color{120, 200, 100, 255});
     y += HUD_LINE_H;
 
-    // Controls hint
-    DrawText("LMB select  |  RMB deselect  |  SPACE next turn", HUD_X, y, PANEL_KEY_SIZE, HUD_DIM_COL);
-    y += HUD_LINE_H;
-
-    // Selected unit — now shows faction name, color, and diplomacy.
-    if (selectedUnit != NO_SELECTION) {
-        const auto &unit = state.units().at(selectedUnit);
-        std::string info = unit->name() + "  HP " + std::to_string(unit->health()) + "/" +
-                           std::to_string(unit->maxHealth()) + "  Moves " + std::to_string(unit->movementRemaining()) +
-                           "/" + std::to_string(unit->movement());
-        if (unit->level() > 0) {
-            info += "  Lv " + std::to_string(unit->level());
-        }
-        info += "  XP " + std::to_string(unit->experience());
-        DrawText(info.c_str(), HUD_X, y, HUD_TEXT_SIZE, YELLOW);
-        y += HUD_LINE_H;
-
-        // Show faction name and diplomacy relation for the selected unit.
-        const auto *unitFaction = state.factionRegistry().findFaction(unit->factionId());
-        if (unitFaction != nullptr) {
-            Color unitFactionColor =
-                engine::faction_colors::factionColor(unitFaction->type(), unitFaction->colorIndex());
-            DrawText(unitFaction->name().c_str(), HUD_X, y, HUD_TEXT_SIZE, unitFactionColor);
-
-            // Show diplomacy state if this is a foreign unit.
-            if (unit->factionId() != PLAYER_FACTION_ID) {
-                auto relation = state.diplomacy().getRelation(PLAYER_FACTION_ID, unit->factionId());
-                Color dipColor = engine::diplomacy_colors::diplomacyColor(relation);
-                const char *dipLabel = engine::diplomacy_colors::diplomacyLabel(relation);
-                std::string dipStr = std::string("  [") + dipLabel + "]";
-                int nameW = MeasureText(unitFaction->name().c_str(), HUD_TEXT_SIZE);
-                DrawText(dipStr.c_str(), HUD_X + nameW, y, HUD_TEXT_SIZE, dipColor);
-            }
-        }
-        y += HUD_LINE_H;
-
-        // Show terrain defense bonus for the unit's current tile.
-        auto terrain = state.map().tile(unit->row(), unit->col()).terrainType();
-        const auto &terrainProps = game::getTerrainProperties(terrain);
-        std::string terrainStr = "Terrain: " + std::string(game::terrainName(terrain));
-        if (terrainProps.defenseModifier > 0) {
-            terrainStr += "  Defense +" + std::to_string(terrainProps.defenseModifier);
-        } else if (terrainProps.defenseModifier < 0) {
-            terrainStr += "  Defense " + std::to_string(terrainProps.defenseModifier);
-        }
-        Color terrainColor = HUD_DIM_COL;
-        if (terrainProps.defenseModifier > 0) {
-            terrainColor = Color{100, 200, 255, 255};
-        } else if (terrainProps.defenseModifier < 0) {
-            terrainColor = Color{255, 140, 100, 255};
-        }
-        DrawText(terrainStr.c_str(), HUD_X, y, HUD_TEXT_SIZE, terrainColor);
-    }
+    // Controls hint.
+    DrawText("LMB select  |  RMB deselect  |  SPACE / End Turn button", HUD_X, y, PANEL_KEY_SIZE, HUD_DIM_COL);
 }
 
 // ── Faction list panel (bottom-left) ─────────────────────────────────────────
@@ -865,13 +978,12 @@ static void handleInput(game::GameState &state, const std::optional<engine::hex:
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
-static void renderFrame(const game::GameState &state, Camera3D cam,
-                        const std::optional<engine::hex::TileCoord> &hoveredTile, int selectedUnit,
-                        std::optional<game::CityId> selectedCity, engine::CombatEffectManager &effects,
-                        const game::CombatLog &combatLog, int combatLogScroll,
-                        const std::vector<game::ReachableTile> &movementRange) {
-    engine::window::beginFrame();
-
+static void renderGameFrame(const game::GameState &state, Camera3D cam,
+                            const std::optional<engine::hex::TileCoord> &hoveredTile, int selectedUnit,
+                            std::optional<game::CityId> selectedCity, engine::CombatEffectManager &effects,
+                            const game::CombatLog &combatLog, int combatLogScroll,
+                            const std::vector<game::ReachableTile> &movementRange, const engine::Tooltip &tooltip,
+                            const engine::EndTurnButton &endTurnBtn) {
     BeginMode3D(cam);
     const auto *fog = &state.fogOfWar();
     engine::drawMap(state.map(), hoveredTile, fog, PLAYER_FACTION_ID);
@@ -903,7 +1015,13 @@ static void renderFrame(const game::GameState &state, Camera3D cam,
     // Draw 2D overlay effects (floating damage numbers, projected from 3D).
     effects.drawDamageNumbers(cam);
 
-    drawTopHud(state, selectedUnit);
+    // Draw HUD panels: unit info panel (replaces old top HUD when unit selected)
+    // or compact resource HUD when no unit is selected.
+    if (selectedUnit != NO_SELECTION) {
+        drawUnitInfoPanel(state, selectedUnit);
+    } else {
+        drawTopHud(state);
+    }
 
     if (selectedCity) {
         for (const auto &city : state.cities()) {
@@ -923,7 +1041,112 @@ static void renderFrame(const game::GameState &state, Camera3D cam,
     engine::minimap::draw(state.map(), &state.fogOfWar(), PLAYER_FACTION_ID, state.units(), state.cities(),
                           state.factionRegistry(), cam, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    engine::window::endFrame();
+    // Draw end-turn button.
+    endTurnBtn.draw(SCREEN_WIDTH, SCREEN_HEIGHT, state.getTurn());
+
+    // Draw tooltip (on top of everything).
+    tooltip.draw(state, PLAYER_FACTION_ID);
+}
+
+// ── All mutable game-loop state, bundled to keep main() simple ───────────────
+
+struct AppState {
+    engine::Screen currentScreen = engine::Screen::MainMenu;
+    engine::Screen pendingScreen = engine::Screen::MainMenu;
+    engine::MainMenu mainMenu;
+    engine::SettingsScreen settingsScreen;
+    engine::Transition transition;
+    bool gameInitialized = false;
+    bool quitRequested = false;
+
+    game::GameState state{MAP_ROWS, MAP_COLS};
+    engine::Camera camera;
+    int selectedUnit = NO_SELECTION;
+    std::optional<game::CityId> selectedCity;
+
+    engine::CombatEffectManager combatEffects;
+    game::CombatLog combatLog;
+    int combatLogScroll = 0;
+
+    std::vector<game::ReachableTile> movementRange;
+
+    engine::Tooltip tooltip;
+    engine::EndTurnButton endTurnBtn;
+};
+
+// ── Per-screen update + draw helpers ─────────────────────────────────────────
+
+static void updateMainMenu(AppState &app, int screenW, int screenH) {
+    app.mainMenu.draw(screenW, screenH);
+    if (app.transition.isActive()) {
+        return;
+    }
+    auto action = app.mainMenu.update(screenW, screenH);
+    if (action == engine::MenuAction::NewGame) {
+        app.pendingScreen = engine::Screen::InGame;
+        app.transition.start(engine::TransitionDir::FadeOut);
+    } else if (action == engine::MenuAction::Settings) {
+        app.pendingScreen = engine::Screen::Settings;
+        app.transition.start(engine::TransitionDir::FadeOut);
+    } else if (action == engine::MenuAction::Quit) {
+        app.quitRequested = true;
+    }
+}
+
+static void updateSettings(AppState &app, int screenW, int screenH) {
+    app.settingsScreen.draw(screenW, screenH);
+    if (app.transition.isActive()) {
+        return;
+    }
+    auto action = app.settingsScreen.update(screenW, screenH);
+    if (action == engine::MenuAction::BackToMenu) {
+        app.pendingScreen = engine::Screen::MainMenu;
+        app.transition.start(engine::TransitionDir::FadeOut);
+    }
+}
+
+static void updateInGame(AppState &app, float dt) {
+    app.camera.update();
+    Camera3D cam = app.camera.raw();
+    auto hoveredTile = engine::input::mouseToTile(cam, MAP_ROWS, MAP_COLS);
+
+    app.combatEffects.update(dt);
+
+    if (hoveredTile) {
+        app.tooltip.update(hoveredTile->row, hoveredTile->col, true, dt);
+    } else {
+        app.tooltip.update(0, 0, false, dt);
+    }
+
+    if (!app.transition.isActive()) {
+        handleInput(app.state, hoveredTile, app.selectedUnit, app.selectedCity, app.combatEffects, app.combatLog,
+                    app.combatLogScroll);
+        handleSaveLoad(app.state, app.selectedUnit);
+        if (app.endTurnBtn.update(SCREEN_WIDTH, SCREEN_HEIGHT)) {
+            processTurn(app.state);
+        }
+    }
+
+    app.movementRange.clear();
+    if (app.selectedUnit != NO_SELECTION) {
+        const auto &unit = app.state.units().at(app.selectedUnit);
+        if (unit->isAlive() && unit->factionId() == PLAYER_FACTION_ID) {
+            app.movementRange = game::computeMovementRange(unit->row(), unit->col(), unit->movementRemaining(),
+                                                           app.state.map(), app.state.registry(), unit->factionId());
+        }
+    }
+
+    renderGameFrame(app.state, cam, hoveredTile, app.selectedUnit, app.selectedCity, app.combatEffects, app.combatLog,
+                    app.combatLogScroll, app.movementRange, app.tooltip, app.endTurnBtn);
+}
+
+static void handleTransitionComplete(AppState &app) {
+    app.currentScreen = app.pendingScreen;
+    app.transition.start(engine::TransitionDir::FadeIn);
+    if (app.currentScreen == engine::Screen::InGame && !app.gameInitialized) {
+        setupDemoState(app.state);
+        app.gameInitialized = true;
+    }
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -931,46 +1154,36 @@ static void renderFrame(const game::GameState &state, Camera3D cam,
 int main() {
     engine::window::init(SCREEN_WIDTH, SCREEN_HEIGHT, "My4X");
 
-    game::GameState state(MAP_ROWS, MAP_COLS);
-    engine::Camera camera;
-
-    int selectedUnit = NO_SELECTION;
-    std::optional<game::CityId> selectedCity;
-
-    // Combat feedback systems.
-    engine::CombatEffectManager combatEffects;
-    game::CombatLog combatLog;
-    int combatLogScroll = 0;
-
-    // Movement range overlay (recomputed each frame for the selected unit).
-    std::vector<game::ReachableTile> movementRange;
-
-    setupDemoState(state);
+    AppState app;
+    app.transition.start(engine::TransitionDir::FadeIn);
 
     while (engine::window::isRunning()) {
-        camera.update();
-        Camera3D cam = camera.raw();
-        auto hoveredTile = engine::input::mouseToTile(cam, MAP_ROWS, MAP_COLS);
         float dt = GetFrameTime();
+        int screenW = GetScreenWidth();
+        int screenH = GetScreenHeight();
 
-        // Update combat effects with delta time (frame-rate independent).
-        combatEffects.update(dt);
+        app.transition.update(dt);
 
-        handleInput(state, hoveredTile, selectedUnit, selectedCity, combatEffects, combatLog, combatLogScroll);
-        handleSaveLoad(state, selectedUnit);
-
-        // Recompute movement range overlay for the selected player unit.
-        movementRange.clear();
-        if (selectedUnit != NO_SELECTION) {
-            const auto &unit = state.units().at(selectedUnit);
-            if (unit->isAlive() && unit->factionId() == PLAYER_FACTION_ID) {
-                movementRange = game::computeMovementRange(unit->row(), unit->col(), unit->movementRemaining(),
-                                                           state.map(), state.registry(), unit->factionId());
-            }
+        if (app.transition.isComplete() && app.transition.alpha() >= 1.0F) {
+            handleTransitionComplete(app);
         }
 
-        renderFrame(state, cam, hoveredTile, selectedUnit, selectedCity, combatEffects, combatLog, combatLogScroll,
-                    movementRange);
+        engine::window::beginFrame();
+
+        if (app.currentScreen == engine::Screen::MainMenu) {
+            updateMainMenu(app, screenW, screenH);
+        } else if (app.currentScreen == engine::Screen::Settings) {
+            updateSettings(app, screenW, screenH);
+        } else {
+            updateInGame(app, dt);
+        }
+
+        app.transition.draw(screenW, screenH);
+        engine::window::endFrame();
+
+        if (app.quitRequested) {
+            break;
+        }
     }
 
     engine::window::shutdown();
