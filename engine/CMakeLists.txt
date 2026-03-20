@@ -17,6 +17,7 @@ add_library(my4x_engine STATIC
     src/Tooltip.cpp
     src/MenuSystem.cpp
     src/EndTurnButton.cpp
+    src/ModelManager.cpp
 )
 
 target_include_directories(my4x_engine PUBLIC include)
