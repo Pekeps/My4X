@@ -24,6 +24,7 @@ add_library(my4x_game STATIC
     src/CaptureAction.cpp
     src/MoveAction.cpp
     src/MapGenerator.cpp
+    src/Pathfinding.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
