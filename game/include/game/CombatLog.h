@@ -55,6 +55,12 @@ struct CombatEvent {
     std::string attackerFactionName;
     /// Display name of the defender's faction (captured at combat time for log display).
     std::string defenderFactionName;
+
+    /// Whether this event represents a city capture rather than combat.
+    bool isCaptureEvent = false;
+
+    /// Name of the captured city (only valid when isCaptureEvent is true).
+    std::string capturedCityName;
 };
 
 /// Bounded combat log that stores a fixed maximum number of events.

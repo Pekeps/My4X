@@ -67,6 +67,13 @@ void BuildQueue::cancel() {
     }
 }
 
+void BuildQueue::clear() {
+    while (!queue_.empty()) {
+        queue_.pop();
+    }
+    accumulated_ = 0;
+}
+
 bool BuildQueue::isEmpty() const { return queue_.empty(); }
 
 std::vector<BuildQueueItem> BuildQueue::allItems() const {
