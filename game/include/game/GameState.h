@@ -3,6 +3,7 @@
 #include "game/Building.h"
 #include "game/City.h"
 #include "game/Faction.h"
+#include "game/DiplomacyManager.h"
 #include "game/FactionRegistry.h"
 #include "game/Map.h"
 #include "game/Resource.h"
@@ -55,6 +56,12 @@ class GameState {
     /// Find a city by ID, or nullptr if not found.
     [[nodiscard]] City *findCity(CityId id);
 
+    /// Return pointers to all cities owned by the given faction.
+    [[nodiscard]] std::vector<const City *> citiesForFaction(int factionId) const;
+
+    /// Return mutable pointers to all cities owned by the given faction.
+    [[nodiscard]] std::vector<City *> mutableCitiesForFaction(int factionId);
+
     /// Add a city preserving its existing ID (for deserialization).
     void restoreCity(City city);
     void setNextCityId(CityId id);
@@ -85,6 +92,11 @@ class GameState {
     [[nodiscard]] const FactionRegistry &factionRegistry() const;
     [[nodiscard]] FactionRegistry &mutableFactionRegistry();
 
+    // -- DiplomacyManager ----------------------------------------------
+
+    [[nodiscard]] const DiplomacyManager &diplomacy() const;
+    [[nodiscard]] DiplomacyManager &mutableDiplomacy();
+
     // -- Faction resources ---------------------------------------------
 
     [[nodiscard]] const Resource &factionResources() const;
@@ -102,6 +114,7 @@ class GameState {
     std::vector<Building> buildings_;
     std::vector<std::unique_ptr<Unit>> units_;
     FactionRegistry factionRegistry_;
+    DiplomacyManager diplomacy_;
     Resource factionResources_;
 
     CityId nextCityId_ = 1;

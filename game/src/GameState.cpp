@@ -58,6 +58,26 @@ City *GameState::findCity(CityId id) {
     return iter != cities_.end() ? &*iter : nullptr;
 }
 
+std::vector<const City *> GameState::citiesForFaction(int factionId) const {
+    std::vector<const City *> result;
+    for (const auto &city : cities_) {
+        if (city.factionId() == factionId) {
+            result.push_back(&city);
+        }
+    }
+    return result;
+}
+
+std::vector<City *> GameState::mutableCitiesForFaction(int factionId) {
+    std::vector<City *> result;
+    for (auto &city : cities_) {
+        if (city.factionId() == factionId) {
+            result.push_back(&city);
+        }
+    }
+    return result;
+}
+
 void GameState::restoreCity(City city) {
     CityId id = city.id();
     for (const auto &[tRow, tCol] : city.tiles()) {
@@ -146,6 +166,12 @@ std::vector<const Unit *> GameState::unitsForFaction(FactionId factionId) const 
 const FactionRegistry &GameState::factionRegistry() const { return factionRegistry_; }
 
 FactionRegistry &GameState::mutableFactionRegistry() { return factionRegistry_; }
+
+// -- DiplomacyManager --------------------------------------------------
+
+const DiplomacyManager &GameState::diplomacy() const { return diplomacy_; }
+
+DiplomacyManager &GameState::mutableDiplomacy() { return diplomacy_; }
 
 // -- Faction resources -------------------------------------------------
 

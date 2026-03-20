@@ -1,7 +1,10 @@
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
 #include "game/TurnResolver.h"
 
 #include "game/Building.h"
 #include "game/City.h"
+#include "game/Faction.h"
+#include "game/FactionRegistry.h"
 #include "game/GameState.h"
 #include "game/UnitTypeRegistry.h"
 #include "game/Warrior.h"
@@ -239,3 +242,130 @@ TEST(TurnResolverTest, MultipleCitiesAccumulateIndependently) {
 
     EXPECT_EQ(state.factionResources().gold, 3);
 }
+
+// -- Faction-aware resource routing tests ------------------------------
+
+TEST(TurnResolverTest, GoldRoutesToRegisteredFaction) {
+    auto state = makeTestState();
+
+    // Register a faction
+    FactionId fid = state.mutableFactionRegistry().addFaction("Rome", FactionType::Player, 0);
+
+    // Create a city owned by this faction
+    City city("Rome", 1, 1, static_cast<int>(fid));
+    city.addTile(2, 2);
+    state.addCity(std::move(city));
+
+    state.addBuilding(makeMarket(2, 2));
+
+    EXPECT_EQ(state.factionRegistry().getFaction(fid).stockpile().gold, 0);
+
+    resolveTurn(state);
+
+    // Gold should go to the faction's stockpile, not the legacy one
+    EXPECT_EQ(state.factionRegistry().getFaction(fid).stockpile().gold, 3);
+    EXPECT_EQ(state.factionResources().gold, 0);
+}
+
+TEST(TurnResolverTest, GoldRoutesToCorrectFactionForMultipleFactions) {
+    auto state = makeTestState();
+
+    FactionId fid1 = state.mutableFactionRegistry().addFaction("Rome", FactionType::Player, 0);
+    FactionId fid2 = state.mutableFactionRegistry().addFaction("Greece", FactionType::Player, 1);
+
+    // City 1 owned by faction 1 with a market
+    City city1("Rome", 1, 1, static_cast<int>(fid1));
+    city1.addTile(2, 2);
+    state.addCity(std::move(city1));
+    state.addBuilding(makeMarket(2, 2));
+
+    // City 2 owned by faction 2 with a market
+    City city2("Athens", 5, 5, static_cast<int>(fid2));
+    city2.addTile(6, 6);
+    state.addCity(std::move(city2));
+    state.addBuilding(makeMarket(6, 6));
+
+    resolveTurn(state);
+
+    EXPECT_EQ(state.factionRegistry().getFaction(fid1).stockpile().gold, 3);
+    EXPECT_EQ(state.factionRegistry().getFaction(fid2).stockpile().gold, 3);
+    EXPECT_EQ(state.factionResources().gold, 0);
+}
+
+TEST(TurnResolverTest, GoldAccumulatesAcrossTurnsForFaction) {
+    auto state = makeTestState();
+
+    FactionId fid = state.mutableFactionRegistry().addFaction("Rome", FactionType::Player, 0);
+
+    City city("Rome", 1, 1, static_cast<int>(fid));
+    city.addTile(2, 2);
+    state.addCity(std::move(city));
+    state.addBuilding(makeMarket(2, 2));
+
+    resolveTurn(state);
+    resolveTurn(state);
+
+    EXPECT_EQ(state.factionRegistry().getFaction(fid).stockpile().gold, 6);
+}
+
+TEST(TurnResolverTest, CapturedCityRoutesToNewFaction) {
+    auto state = makeTestState();
+
+    FactionId fid1 = state.mutableFactionRegistry().addFaction("Rome", FactionType::Player, 0);
+    FactionId fid2 = state.mutableFactionRegistry().addFaction("Greece", FactionType::Player, 1);
+
+    City city("Disputed", 1, 1, static_cast<int>(fid1));
+    city.addTile(2, 2);
+    state.addCity(std::move(city));
+    state.addBuilding(makeMarket(2, 2));
+
+    // First turn: gold goes to faction 1
+    resolveTurn(state);
+    EXPECT_EQ(state.factionRegistry().getFaction(fid1).stockpile().gold, 3);
+    EXPECT_EQ(state.factionRegistry().getFaction(fid2).stockpile().gold, 0);
+
+    // Capture: city changes ownership to faction 2
+    state.mutableCities()[0].setFactionId(static_cast<int>(fid2));
+
+    // Second turn: gold goes to faction 2
+    resolveTurn(state);
+    EXPECT_EQ(state.factionRegistry().getFaction(fid1).stockpile().gold, 3);
+    EXPECT_EQ(state.factionRegistry().getFaction(fid2).stockpile().gold, 3);
+}
+
+TEST(TurnResolverTest, FactionTotalIncomeIsSumOfCityOutputs) {
+    auto state = makeTestState();
+
+    FactionId fid = state.mutableFactionRegistry().addFaction("Rome", FactionType::Player, 0);
+
+    // Two cities owned by the same faction, each with a market
+    City city1("Rome", 1, 1, static_cast<int>(fid));
+    city1.addTile(2, 2);
+    state.addCity(std::move(city1));
+    state.addBuilding(makeMarket(2, 2));
+
+    City city2("Pompeii", 5, 5, static_cast<int>(fid));
+    city2.addTile(6, 6);
+    state.addCity(std::move(city2));
+    state.addBuilding(makeMarket(6, 6));
+
+    resolveTurn(state);
+
+    // Total = 3 + 3 = 6
+    EXPECT_EQ(state.factionRegistry().getFaction(fid).stockpile().gold, 6);
+}
+
+TEST(TurnResolverTest, UnregisteredFactionFallsBackToLegacy) {
+    auto state = makeTestState();
+
+    // City with factionId=0 (no registered faction) — legacy behavior
+    City city("Unowned", 1, 1);
+    city.addTile(2, 2);
+    state.addCity(std::move(city));
+    state.addBuilding(makeMarket(2, 2));
+
+    resolveTurn(state);
+
+    EXPECT_EQ(state.factionResources().gold, 3);
+}
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers)

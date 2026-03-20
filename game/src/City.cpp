@@ -17,6 +17,7 @@ const std::string &City::name() const { return name_; }
 int City::centerRow() const { return centerRow_; }
 int City::centerCol() const { return centerCol_; }
 int City::factionId() const { return factionId_; }
+void City::setFactionId(int newFactionId) { factionId_ = newFactionId; }
 int City::population() const { return population_; }
 
 void City::growPopulation(int amount) {
