@@ -5,6 +5,7 @@
 
 #include "game/AttackAction.h"
 #include "game/Map.h"
+#include "game/Pathfinding.h"
 #include "game/Unit.h"
 
 #include "raylib.h"
@@ -18,6 +19,9 @@ constexpr int RANGED_THRESHOLD = 2;
 
 /// Color for the attack range overlay (semi-transparent orange-red).
 const Color ATTACK_RANGE_COLOR = {255, 120, 40, 60};
+
+/// Color for the movement range overlay (semi-transparent blue).
+const Color MOVEMENT_RANGE_COLOR = {40, 120, 255, 60};
 
 } // namespace
 
@@ -46,6 +50,13 @@ void drawAttackRangeOverlay(const game::Unit &unit, const game::Map &map) {
                 drawFilledHex3D(center, ATTACK_RANGE_COLOR);
             }
         }
+    }
+}
+
+void drawMovementRangeOverlay(const std::vector<game::ReachableTile> &reachableTiles) {
+    for (const auto &tile : reachableTiles) {
+        Vector3 center = hex::tileCenter(tile.coord.row, tile.coord.col);
+        drawFilledHex3D(center, MOVEMENT_RANGE_COLOR);
     }
 }
 

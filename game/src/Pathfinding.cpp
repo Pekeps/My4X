@@ -199,4 +199,71 @@ std::vector<TileCoord> findPath(int startRow, int startCol, int goalRow, int goa
     return {};
 }
 
+std::vector<ReachableTile> computeMovementRange(int startRow, int startCol, int movementBudget, const Map &map,
+                                                const TileRegistry &registry, FactionId factionId) {
+    int mapHeight = map.height();
+    int mapWidth = map.width();
+
+    // Dijkstra flood-fill: min-heap ordered by accumulated cost.
+    struct CostNode {
+        TileCoord coord;
+        int cost;
+        bool operator>(const CostNode &other) const { return cost > other.cost; }
+    };
+
+    std::priority_queue<CostNode, std::vector<CostNode>, std::greater<>> frontier;
+    std::unordered_map<TileCoord, int, TileCoordHash> bestCost;
+
+    TileCoord start = {.row = startRow, .col = startCol};
+    bestCost[start] = 0;
+    frontier.push({start, 0});
+
+    while (!frontier.empty()) {
+        auto current = frontier.top();
+        frontier.pop();
+
+        // Skip stale entries.
+        auto it = bestCost.find(current.coord);
+        if (it != bestCost.end() && current.cost > it->second) {
+            continue;
+        }
+
+        auto neighbors = hexNeighbors(current.coord.row, current.coord.col, mapHeight, mapWidth);
+
+        for (const auto &neighbor : neighbors) {
+            if (isTileBlocked(neighbor.row, neighbor.col, map, registry, factionId)) {
+                continue;
+            }
+
+            const auto &tile = map.tile(neighbor.row, neighbor.col);
+            const auto &props = getTerrainProperties(tile.terrainType());
+            int newCost = current.cost + props.movementCost;
+
+            if (newCost > movementBudget) {
+                continue;
+            }
+
+            auto neighborIt = bestCost.find(neighbor);
+            int existingCost = (neighborIt != bestCost.end()) ? neighborIt->second : INFINITE_COST;
+
+            if (newCost < existingCost) {
+                bestCost[neighbor] = newCost;
+                frontier.push({neighbor, newCost});
+            }
+        }
+    }
+
+    // Collect all reachable tiles (excluding the start).
+    std::vector<ReachableTile> result;
+    result.reserve(bestCost.size());
+    for (const auto &[coord, cost] : bestCost) {
+        if (coord == start) {
+            continue;
+        }
+        result.push_back({coord, cost});
+    }
+
+    return result;
+}
+
 } // namespace game

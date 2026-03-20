@@ -25,6 +25,7 @@
 #include "game/GameState.h"
 #include "game/MoveAction.h"
 #include "game/NeutralAI.h"
+#include "game/Pathfinding.h"
 #include "game/SaveLoad.h"
 #include "game/TerrainType.h"
 #include "game/Unit.h"
@@ -866,12 +867,18 @@ static void handleInput(game::GameState &state, const std::optional<engine::hex:
 static void renderFrame(const game::GameState &state, Camera3D cam,
                         const std::optional<engine::hex::TileCoord> &hoveredTile, int selectedUnit,
                         std::optional<game::CityId> selectedCity, engine::CombatEffectManager &effects,
-                        const game::CombatLog &combatLog, int combatLogScroll) {
+                        const game::CombatLog &combatLog, int combatLogScroll,
+                        const std::vector<game::ReachableTile> &movementRange) {
     engine::window::beginFrame();
 
     BeginMode3D(cam);
     const auto *fog = &state.fogOfWar();
     engine::drawMap(state.map(), hoveredTile, fog, PLAYER_FACTION_ID);
+
+    // Draw movement range overlay for selected unit.
+    if (selectedUnit != NO_SELECTION) {
+        engine::drawMovementRangeOverlay(movementRange);
+    }
 
     // Draw attack range overlay for selected ranged unit.
     if (selectedUnit != NO_SELECTION) {
@@ -930,6 +937,9 @@ int main() {
     game::CombatLog combatLog;
     int combatLogScroll = 0;
 
+    // Movement range overlay (recomputed each frame for the selected unit).
+    std::vector<game::ReachableTile> movementRange;
+
     setupDemoState(state);
 
     while (engine::window::isRunning()) {
@@ -944,7 +954,18 @@ int main() {
         handleInput(state, hoveredTile, selectedUnit, selectedCity, combatEffects, combatLog, combatLogScroll);
         handleSaveLoad(state, selectedUnit);
 
-        renderFrame(state, cam, hoveredTile, selectedUnit, selectedCity, combatEffects, combatLog, combatLogScroll);
+        // Recompute movement range overlay for the selected player unit.
+        movementRange.clear();
+        if (selectedUnit != NO_SELECTION) {
+            const auto &unit = state.units().at(selectedUnit);
+            if (unit->isAlive() && unit->factionId() == PLAYER_FACTION_ID) {
+                movementRange = game::computeMovementRange(unit->row(), unit->col(), unit->movementRemaining(),
+                                                           state.map(), state.registry(), unit->factionId());
+            }
+        }
+
+        renderFrame(state, cam, hoveredTile, selectedUnit, selectedCity, combatEffects, combatLog, combatLogScroll,
+                    movementRange);
     }
 
     engine::window::shutdown();
