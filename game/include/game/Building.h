@@ -2,6 +2,7 @@
 
 #include "game/Resource.h"
 #include "game/TerrainType.h"
+#include "game/TileCoord.h"
 
 #include <cstdint>
 #include <set>
@@ -10,15 +11,6 @@
 namespace game {
 
 using BuildingId = std::uint32_t;
-
-/// Coordinate pair for a hex tile.
-struct TileCoord {
-    int row;
-    int col;
-
-    [[nodiscard]] friend bool operator==(const TileCoord &lhs, const TileCoord &rhs) = default;
-    [[nodiscard]] friend auto operator<=>(const TileCoord &lhs, const TileCoord &rhs) = default;
-};
 
 /// A building that occupies one or more hex tiles and produces resources.
 ///
