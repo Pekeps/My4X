@@ -22,6 +22,9 @@ class FactionRegistry {
     /// Look up a faction by ID.  Throws std::out_of_range if not found.
     [[nodiscard]] const Faction &getFaction(FactionId id) const;
 
+    /// Look up a faction by ID.  Returns nullptr if not found.
+    [[nodiscard]] const Faction *findFaction(FactionId id) const;
+
     /// Mutable lookup by ID.  Throws std::out_of_range if not found.
     [[nodiscard]] Faction &getMutableFaction(FactionId id);
 
