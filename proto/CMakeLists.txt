@@ -25,7 +25,7 @@ target_link_libraries(my4x_proto PUBLIC protobuf::libprotobuf)
 
 # Protobuf v22+ depends on abseil internally; link it when available.
 find_package(absl QUIET)
-if(absl_FOUND)
+if(TARGET absl::log_internal_check_op)
     target_link_libraries(my4x_proto PUBLIC absl::log_internal_check_op)
 endif()
 
