@@ -8,8 +8,9 @@ namespace game {
 
 namespace {
 
-constexpr std::array<TerrainType, 5> allTerrains = {
-    TerrainType::Plains, TerrainType::Hills, TerrainType::Forest, TerrainType::Water, TerrainType::Mountain,
+constexpr std::array<TerrainType, TERRAIN_TYPE_COUNT> allTerrains = {
+    TerrainType::Plains,   TerrainType::Hills,  TerrainType::Forest, TerrainType::Water,
+    TerrainType::Mountain, TerrainType::Desert, TerrainType::Swamp,
 };
 
 std::vector<std::vector<Tile>> generateTiles(int height, int width, std::uint64_t seed) {

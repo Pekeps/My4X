@@ -1,3 +1,4 @@
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 #include "game/Map.h"
 #include "game/TerrainType.h"
 #include "game/Tile.h"
@@ -6,13 +7,19 @@
 
 #include <set>
 
+// ── terrainName tests ────────────────────────────────────────────────────────
+
 TEST(TerrainTypeTest, TerrainNameReturnsCorrectStrings) {
     EXPECT_EQ(game::terrainName(game::TerrainType::Plains), "Plains");
     EXPECT_EQ(game::terrainName(game::TerrainType::Hills), "Hills");
     EXPECT_EQ(game::terrainName(game::TerrainType::Forest), "Forest");
     EXPECT_EQ(game::terrainName(game::TerrainType::Water), "Water");
     EXPECT_EQ(game::terrainName(game::TerrainType::Mountain), "Mountain");
+    EXPECT_EQ(game::terrainName(game::TerrainType::Desert), "Desert");
+    EXPECT_EQ(game::terrainName(game::TerrainType::Swamp), "Swamp");
 }
+
+// ── Tile terrain storage ─────────────────────────────────────────────────────
 
 TEST(TileTest, DefaultTerrainIsPlains) {
     game::Tile tile(0, 0);
@@ -32,13 +39,117 @@ TEST(TileTest, AllTerrainTypesCanBeAssigned) {
     game::Tile forest(0, 2, game::TerrainType::Forest);
     game::Tile water(0, 3, game::TerrainType::Water);
     game::Tile mountain(0, 4, game::TerrainType::Mountain);
+    game::Tile desert(0, 5, game::TerrainType::Desert);
+    game::Tile swamp(0, 6, game::TerrainType::Swamp);
 
     EXPECT_EQ(plains.terrainType(), game::TerrainType::Plains);
     EXPECT_EQ(hills.terrainType(), game::TerrainType::Hills);
     EXPECT_EQ(forest.terrainType(), game::TerrainType::Forest);
     EXPECT_EQ(water.terrainType(), game::TerrainType::Water);
     EXPECT_EQ(mountain.terrainType(), game::TerrainType::Mountain);
+    EXPECT_EQ(desert.terrainType(), game::TerrainType::Desert);
+    EXPECT_EQ(swamp.terrainType(), game::TerrainType::Swamp);
 }
+
+// ── TerrainProperties lookup tests ───────────────────────────────────────────
+
+TEST(TerrainPropertiesTest, PlainsProperties) {
+    const auto &props = game::getTerrainProperties(game::TerrainType::Plains);
+    EXPECT_EQ(props.movementCost, 1);
+    EXPECT_EQ(props.defenseModifier, 0);
+    EXPECT_TRUE(props.passable);
+    EXPECT_TRUE(props.buildable);
+}
+
+TEST(TerrainPropertiesTest, HillsProperties) {
+    const auto &props = game::getTerrainProperties(game::TerrainType::Hills);
+    EXPECT_EQ(props.movementCost, 2);
+    EXPECT_EQ(props.defenseModifier, 3);
+    EXPECT_TRUE(props.passable);
+    EXPECT_TRUE(props.buildable);
+}
+
+TEST(TerrainPropertiesTest, ForestProperties) {
+    const auto &props = game::getTerrainProperties(game::TerrainType::Forest);
+    EXPECT_EQ(props.movementCost, 2);
+    EXPECT_EQ(props.defenseModifier, 2);
+    EXPECT_TRUE(props.passable);
+    EXPECT_TRUE(props.buildable);
+}
+
+TEST(TerrainPropertiesTest, WaterProperties) {
+    const auto &props = game::getTerrainProperties(game::TerrainType::Water);
+    EXPECT_EQ(props.movementCost, 0);
+    EXPECT_EQ(props.defenseModifier, 0);
+    EXPECT_FALSE(props.passable);
+    EXPECT_FALSE(props.buildable);
+}
+
+TEST(TerrainPropertiesTest, MountainProperties) {
+    const auto &props = game::getTerrainProperties(game::TerrainType::Mountain);
+    EXPECT_EQ(props.movementCost, 0);
+    EXPECT_EQ(props.defenseModifier, 0);
+    EXPECT_FALSE(props.passable);
+    EXPECT_FALSE(props.buildable);
+}
+
+TEST(TerrainPropertiesTest, DesertProperties) {
+    const auto &props = game::getTerrainProperties(game::TerrainType::Desert);
+    EXPECT_EQ(props.movementCost, 1);
+    EXPECT_EQ(props.defenseModifier, 0);
+    EXPECT_TRUE(props.passable);
+    EXPECT_TRUE(props.buildable);
+}
+
+TEST(TerrainPropertiesTest, SwampProperties) {
+    const auto &props = game::getTerrainProperties(game::TerrainType::Swamp);
+    EXPECT_EQ(props.movementCost, 3);
+    EXPECT_EQ(props.defenseModifier, -1);
+    EXPECT_TRUE(props.passable);
+    EXPECT_TRUE(props.buildable);
+}
+
+TEST(TerrainPropertiesTest, AllTerrainTypesHaveProperties) {
+    // Verify every terrain type has a valid entry in the properties table.
+    EXPECT_NO_THROW((void)game::getTerrainProperties(game::TerrainType::Plains));
+    EXPECT_NO_THROW((void)game::getTerrainProperties(game::TerrainType::Hills));
+    EXPECT_NO_THROW((void)game::getTerrainProperties(game::TerrainType::Forest));
+    EXPECT_NO_THROW((void)game::getTerrainProperties(game::TerrainType::Water));
+    EXPECT_NO_THROW((void)game::getTerrainProperties(game::TerrainType::Mountain));
+    EXPECT_NO_THROW((void)game::getTerrainProperties(game::TerrainType::Desert));
+    EXPECT_NO_THROW((void)game::getTerrainProperties(game::TerrainType::Swamp));
+}
+
+TEST(TerrainPropertiesTest, ImpassableTerrainHasZeroMovementCost) {
+    // Impassable terrains should have movementCost == 0 as a sentinel.
+    const auto &water = game::getTerrainProperties(game::TerrainType::Water);
+    const auto &mountain = game::getTerrainProperties(game::TerrainType::Mountain);
+    EXPECT_EQ(water.movementCost, 0);
+    EXPECT_EQ(mountain.movementCost, 0);
+    EXPECT_FALSE(water.passable);
+    EXPECT_FALSE(mountain.passable);
+}
+
+TEST(TerrainPropertiesTest, PassableTerrainHasPositiveMovementCost) {
+    // All passable terrains should have a positive movement cost.
+    const auto &plains = game::getTerrainProperties(game::TerrainType::Plains);
+    const auto &hills = game::getTerrainProperties(game::TerrainType::Hills);
+    const auto &forest = game::getTerrainProperties(game::TerrainType::Forest);
+    const auto &desert = game::getTerrainProperties(game::TerrainType::Desert);
+    const auto &swamp = game::getTerrainProperties(game::TerrainType::Swamp);
+    EXPECT_GT(plains.movementCost, 0);
+    EXPECT_GT(hills.movementCost, 0);
+    EXPECT_GT(forest.movementCost, 0);
+    EXPECT_GT(desert.movementCost, 0);
+    EXPECT_GT(swamp.movementCost, 0);
+}
+
+TEST(TerrainPropertiesTest, TerrainTypeCountMatchesEnum) {
+    // Sanity check that TERRAIN_TYPE_COUNT matches the properties table size.
+    EXPECT_EQ(game::TERRAIN_TYPE_COUNT, game::TERRAIN_PROPERTIES.size());
+}
+
+// ── Map generation tests ─────────────────────────────────────────────────────
 
 TEST(MapTest, SeededMapHasDeterministicTerrain) {
     game::Map map1(10, 10, 42);
@@ -79,8 +190,8 @@ TEST(MapTest, SeededMapContainsMultipleTerrainTypes) {
             found.insert(map.tile(row, col).terrainType());
         }
     }
-    // With 400 tiles and 5 terrain types, we expect all types present
-    EXPECT_EQ(found.size(), 5U);
+    // With 400 tiles and 7 terrain types, we expect all types present
+    EXPECT_EQ(found.size(), 7U);
 }
 
 TEST(MapTest, TilesHaveCorrectCoordinates) {
@@ -92,3 +203,4 @@ TEST(MapTest, TilesHaveCorrectCoordinates) {
         }
     }
 }
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

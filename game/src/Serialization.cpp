@@ -45,6 +45,10 @@ game_proto::TerrainType toProtoTerrain(TerrainType t) {
         return game_proto::WATER;
     case TerrainType::Mountain:
         return game_proto::MOUNTAIN;
+    case TerrainType::Desert:
+        return game_proto::DESERT;
+    case TerrainType::Swamp:
+        return game_proto::SWAMP;
     }
     throw std::invalid_argument("Unknown TerrainType: " + std::to_string(static_cast<int>(t)));
 }
@@ -61,6 +65,10 @@ TerrainType fromProtoTerrain(game_proto::TerrainType t) {
         return TerrainType::Water;
     case game_proto::MOUNTAIN:
         return TerrainType::Mountain;
+    case game_proto::DESERT:
+        return TerrainType::Desert;
+    case game_proto::SWAMP:
+        return TerrainType::Swamp;
     default:
         throw std::invalid_argument("Unknown proto TerrainType: " + std::to_string(static_cast<int>(t)));
     }
