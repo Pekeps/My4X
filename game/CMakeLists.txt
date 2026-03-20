@@ -16,6 +16,7 @@ add_library(my4x_game STATIC
     src/Faction.cpp
     src/FactionRegistry.cpp
     src/DiplomacyManager.cpp
+    src/NeutralAI.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)

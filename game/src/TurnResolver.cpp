@@ -4,6 +4,7 @@
 #include "game/City.h"
 #include "game/Faction.h"
 #include "game/FactionRegistry.h"
+#include "game/NeutralAI.h"
 #include "game/Resource.h"
 
 namespace game {
@@ -66,12 +67,52 @@ void resolveTurn(GameState &state) {
         }
     }
 
-    // 2. Reset unit movement.
+    // 2. Generate neutral AI actions (attack intents, holds).
+    //    Actions are generated but not resolved — combat is Phase 3.
+    [[maybe_unused]] auto aiActions = NeutralAI::generateActions(state);
+
+    // 3. Reset unit movement.
     for (auto &unit : state.units()) {
         unit->resetMovement();
     }
 
-    // 3. Advance the turn counter.
+    // 4. Advance the turn counter.
+    state.nextTurn();
+}
+
+void resolveTurn(GameState &state, std::vector<AIAction> &outActions) {
+    // 1. Collect yields and apply production / food for each city.
+    for (City &city : state.mutableCities()) {
+        Resource yields = collectCityYields(city, state);
+
+        // Gold goes to the owning faction's stockpile.
+        routeGoldToFaction(state, city.factionId(), yields.gold);
+
+        // Production: base city production + building production yields.
+        int totalProduction = City::productionPerTurn() + yields.production;
+        auto completed = city.buildQueue().applyProduction(totalProduction);
+        if (completed.has_value()) {
+            state.addBuilding(std::move(*completed));
+        }
+
+        // Food: accumulate surplus, grow population when threshold is met.
+        city.addFoodSurplus(yields.food);
+        int threshold = City::growthThreshold(city.population());
+        if (city.foodSurplus() >= threshold) {
+            city.growPopulation(1);
+            city.setFoodSurplus(city.foodSurplus() - threshold);
+        }
+    }
+
+    // 2. Generate neutral AI actions (attack intents, holds).
+    outActions = NeutralAI::generateActions(state);
+
+    // 3. Reset unit movement.
+    for (auto &unit : state.units()) {
+        unit->resetMovement();
+    }
+
+    // 4. Advance the turn counter.
     state.nextTurn();
 }
 
