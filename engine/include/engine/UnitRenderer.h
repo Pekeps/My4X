@@ -1,5 +1,6 @@
 #pragma once
 
+#include "game/DiplomacyManager.h"
 #include "game/FactionRegistry.h"
 #include "game/Unit.h"
 
@@ -11,7 +12,10 @@ namespace engine {
 // Draws units as 3D markers on the hex grid.
 // Uses the faction registry to look up each unit's faction color.
 // selectedIndex: index of the selected unit (-1 for none), drawn with a highlight.
+// playerFactionId: the human player's faction ID, used to draw diplomacy rings.
+// diplomacy: if provided, draws colored rings to indicate diplomatic relation to the player.
 void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game::FactionRegistry &factions,
-               int selectedIndex = -1);
+               int selectedIndex = -1, game::FactionId playerFactionId = 0,
+               const game::DiplomacyManager *diplomacy = nullptr);
 
 } // namespace engine
