@@ -23,6 +23,7 @@ add_library(my4x_game STATIC
     src/FogOfWar.cpp
     src/CaptureAction.cpp
     src/MoveAction.cpp
+    src/MapGenerator.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
