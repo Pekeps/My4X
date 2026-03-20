@@ -97,6 +97,25 @@ AttackResult AttackAction::execute(GameState &state) const {
     target.takeDamage(result.combat.damageToDefender);
     attacker.takeDamage(result.combat.damageToAttacker);
 
+    // Award experience points based on combat outcome.
+    if (attacker.isAlive()) {
+        int attackerXp = result.combat.damageToDefender * XP_PER_DAMAGE_DEALT;
+        if (result.combat.defenderDied) {
+            attackerXp += XP_KILL_BONUS;
+        }
+        attacker.addExperience(attackerXp);
+    }
+    if (target.isAlive()) {
+        int defenderXp = XP_DEFEND_SURVIVE;
+        if (result.combat.damageToAttacker > 0) {
+            defenderXp += result.combat.damageToAttacker * XP_PER_DAMAGE_DEALT;
+        }
+        if (result.combat.attackerDied) {
+            defenderXp += XP_KILL_BONUS;
+        }
+        target.addExperience(defenderXp);
+    }
+
     // Deduct movement points from attacker (if still alive).
     int newMovement = attacker.movementRemaining() - ATTACK_MOVEMENT_COST;
     attacker.setMovementRemaining(std::max(0, newMovement));
