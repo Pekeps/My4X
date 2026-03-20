@@ -2,6 +2,7 @@
 
 #include "engine/UnitRenderer.h"
 
+#include "engine/DiplomacyColors.h"
 #include "engine/FactionColors.h"
 #include "engine/HexGrid.h"
 
@@ -23,7 +24,7 @@ static constexpr float RING_HEIGHT = 0.05F;
 static constexpr int RING_SLICES = 16;
 
 void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game::FactionRegistry &factions,
-               int selectedIndex) {
+               int selectedIndex, game::FactionId playerFactionId, const game::DiplomacyManager *diplomacy) {
     for (std::size_t i = 0; i < units.size(); ++i) {
         const auto &unit = units.at(i);
         if (!unit->isAlive()) {
@@ -49,6 +50,15 @@ void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game
         if (std::cmp_equal(i, selectedIndex)) {
             Vector3 ringPos = hex::tileCenter(unit->row(), unit->col());
             DrawCylinder(ringPos, RING_RADIUS, RING_RADIUS, RING_HEIGHT, RING_SLICES, YELLOW);
+        }
+
+        // Draw diplomacy indicator ring for foreign units.
+        if (diplomacy != nullptr && unit->factionId() != playerFactionId) {
+            auto relation = diplomacy->getRelation(playerFactionId, unit->factionId());
+            Color dipColor = diplomacy_colors::diplomacyColor(relation);
+            Vector3 ringPos = hex::tileCenter(unit->row(), unit->col());
+            DrawCylinder(ringPos, diplomacy_colors::DIPLOMACY_RING_RADIUS, diplomacy_colors::DIPLOMACY_RING_RADIUS,
+                         diplomacy_colors::DIPLOMACY_RING_HEIGHT, diplomacy_colors::DIPLOMACY_RING_SLICES, dipColor);
         }
     }
 }

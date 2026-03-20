@@ -1,6 +1,7 @@
 #include "engine/CityRenderer.h"
 
 #include "HexDraw.h"
+#include "engine/DiplomacyColors.h"
 #include "engine/FactionColors.h"
 #include "engine/HexGrid.h"
 #include "game/City.h"
@@ -15,7 +16,8 @@ static constexpr float CITY_MARKER_HEIGHT = 0.5F;
 static constexpr int CITY_MARKER_SLICES = 8;
 
 void drawCities(const std::vector<game::City> &cities, const game::FactionRegistry &factions,
-                std::optional<game::CityId> selectedCityId) {
+                std::optional<game::CityId> selectedCityId, game::FactionId playerFactionId,
+                const game::DiplomacyManager *diplomacy) {
     for (const auto &city : cities) {
         const bool selected = selectedCityId && city.id() == *selectedCityId;
 
@@ -41,6 +43,16 @@ void drawCities(const std::vector<game::City> &cities, const game::FactionRegist
         markerPos.y = CITY_MARKER_Y;
         DrawCylinder(markerPos, CITY_MARKER_RADIUS, CITY_MARKER_RADIUS, CITY_MARKER_HEIGHT, CITY_MARKER_SLICES,
                      markerColor);
+
+        // Draw diplomacy indicator ring on foreign cities.
+        auto cityFactionId = static_cast<game::FactionId>(city.factionId());
+        if (diplomacy != nullptr && cityFactionId != playerFactionId) {
+            auto relation = diplomacy->getRelation(playerFactionId, cityFactionId);
+            Color dipColor = diplomacy_colors::diplomacyColor(relation);
+            Vector3 ringPos = hex::tileCenter(city.centerRow(), city.centerCol());
+            DrawCylinder(ringPos, diplomacy_colors::DIPLOMACY_RING_RADIUS, diplomacy_colors::DIPLOMACY_RING_RADIUS,
+                         diplomacy_colors::DIPLOMACY_RING_HEIGHT, diplomacy_colors::DIPLOMACY_RING_SLICES, dipColor);
+        }
     }
 }
 

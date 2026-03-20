@@ -3,6 +3,8 @@
 #include "engine/BuildingRenderer.h"
 #include "engine/Camera.h"
 #include "engine/CityRenderer.h"
+#include "engine/DiplomacyColors.h"
+#include "engine/FactionColors.h"
 #include "engine/Input.h"
 #include "engine/MapRenderer.h"
 #include "engine/UnitRenderer.h"
@@ -10,7 +12,11 @@
 #include "game/BuildQueue.h"
 #include "game/Building.h"
 #include "game/City.h"
+#include "game/DiplomacyManager.h"
+#include "game/Faction.h"
+#include "game/FactionRegistry.h"
 #include "game/GameState.h"
+#include "game/NeutralAI.h"
 #include "game/SaveLoad.h"
 #include "game/TerrainType.h"
 #include "game/UnitTypeRegistry.h"
@@ -74,15 +80,46 @@ const Color HUD_DIM_COL = {100, 100, 120, 255};
 
 const int NO_SELECTION = -1;
 
+// ── Faction list panel (bottom-left) ─────────────────────────────────────────
+
+const int FACTION_PANEL_X = 14;
+const int FACTION_PANEL_Y_OFFSET = 60;
+const int FACTION_PANEL_W = 300;
+const int FACTION_DOT_SIZE = 10;
+const int FACTION_DOT_GAP = 6;
+
+// ── Player faction ID (first registered faction) ────────────────────────────
+
+const game::FactionId PLAYER_FACTION_ID = 1;
+
 // ── Demo setup ───────────────────────────────────────────────────────────────
 
 static void setupDemoState(game::GameState &state) {
-    game::City capital("Ironhold", 5, 3);
+    // Register the player faction.
+    auto &registry = state.mutableFactionRegistry();
+    game::FactionId playerId = registry.addFaction("Roman Empire", game::FactionType::Player, 0);
+
+    // Set city ownership to the player faction.
+    game::City capital("Ironhold", 5, 3, static_cast<int>(playerId));
     capital.addTile(5, 4);
     capital.addTile(4, 3);
     state.addCity(std::move(capital));
     state.addBuilding(game::makeFarm(5, 4));
+
+    // Set initial resources on the player faction's stockpile.
+    auto &playerFaction = registry.getMutableFaction(playerId);
+    playerFaction.addResources(game::Resource{.gold = 50, .production = 20, .food = 30});
+
+    // Also populate the legacy factionResources for backward compat.
     state.factionResources() += game::Resource{.gold = 50, .production = 20, .food = 30};
+
+    // Add a player warrior unit.
+    game::UnitTypeRegistry unitReg;
+    unitReg.registerDefaults();
+    state.addUnit(std::make_unique<game::Warrior>(5, 5, unitReg, playerId));
+
+    // Spawn neutral factions (hostile + passive) with units and diplomacy.
+    game::NeutralAI::spawnNeutralFactions(state);
 }
 
 // ── City click detection ─────────────────────────────────────────────────────
@@ -125,10 +162,16 @@ static void drawProgressBar(int x, int y, int w, int current, int total) {
 // ── Top-left HUD ─────────────────────────────────────────────────────────────
 
 static void drawTopHud(const game::GameState &state, int selectedUnit) {
-    // Background
+    // Determine player faction info.
+    const auto *playerFaction = state.factionRegistry().findFaction(PLAYER_FACTION_ID);
+
+    // Background — compute height dynamically.
     int hudH = 78;
     if (selectedUnit != NO_SELECTION) {
-        hudH += HUD_LINE_H;
+        hudH += HUD_LINE_H * 2; // unit info + faction/diplomacy line
+    }
+    if (playerFaction != nullptr) {
+        hudH += HUD_LINE_H; // faction name line
     }
     DrawRectangleRounded(
         {static_cast<float>(HUD_X - 6), static_cast<float>(HUD_Y - 4), 420.0F, static_cast<float>(hudH)}, 0.08F, 4,
@@ -141,8 +184,16 @@ static void drawTopHud(const game::GameState &state, int selectedUnit) {
     DrawText(turnText.c_str(), HUD_X, y, HUD_TITLE_SIZE, HUD_TITLE_COL);
     y += HUD_TITLE_SIZE + 6;
 
-    // Resources
-    const auto &res = state.factionResources();
+    // Player faction name
+    if (playerFaction != nullptr) {
+        std::string factionLabel = "Faction: " + playerFaction->name();
+        Color factionColor = engine::faction_colors::factionColor(playerFaction->type(), playerFaction->colorIndex());
+        DrawText(factionLabel.c_str(), HUD_X, y, HUD_TEXT_SIZE, factionColor);
+        y += HUD_LINE_H;
+    }
+
+    // Resources — use player faction stockpile if available, otherwise legacy.
+    const game::Resource &res = (playerFaction != nullptr) ? playerFaction->stockpile() : state.factionResources();
     std::string goldStr = "Gold: " + std::to_string(res.gold);
     std::string prodStr = "Prod: " + std::to_string(res.production);
     std::string foodStr = "Food: " + std::to_string(res.food);
@@ -155,29 +206,107 @@ static void drawTopHud(const game::GameState &state, int selectedUnit) {
     DrawText("LMB select  |  RMB deselect  |  SPACE next turn", HUD_X, y, PANEL_KEY_SIZE, HUD_DIM_COL);
     y += HUD_LINE_H;
 
-    // Selected unit
+    // Selected unit — now shows faction name, color, and diplomacy.
     if (selectedUnit != NO_SELECTION) {
         const auto &unit = state.units().at(selectedUnit);
         std::string info = unit->name() + "  HP " + std::to_string(unit->health()) + "/" +
                            std::to_string(unit->maxHealth()) + "  Moves " + std::to_string(unit->movementRemaining()) +
                            "/" + std::to_string(unit->movement());
         DrawText(info.c_str(), HUD_X, y, HUD_TEXT_SIZE, YELLOW);
+        y += HUD_LINE_H;
+
+        // Show faction name and diplomacy relation for the selected unit.
+        const auto *unitFaction = state.factionRegistry().findFaction(unit->factionId());
+        if (unitFaction != nullptr) {
+            Color unitFactionColor =
+                engine::faction_colors::factionColor(unitFaction->type(), unitFaction->colorIndex());
+            DrawText(unitFaction->name().c_str(), HUD_X, y, HUD_TEXT_SIZE, unitFactionColor);
+
+            // Show diplomacy state if this is a foreign unit.
+            if (unit->factionId() != PLAYER_FACTION_ID) {
+                auto relation = state.diplomacy().getRelation(PLAYER_FACTION_ID, unit->factionId());
+                Color dipColor = engine::diplomacy_colors::diplomacyColor(relation);
+                const char *dipLabel = engine::diplomacy_colors::diplomacyLabel(relation);
+                std::string dipStr = std::string("  [") + dipLabel + "]";
+                int nameW = MeasureText(unitFaction->name().c_str(), HUD_TEXT_SIZE);
+                DrawText(dipStr.c_str(), HUD_X + nameW, y, HUD_TEXT_SIZE, dipColor);
+            }
+        }
+    }
+}
+
+// ── Faction list panel (bottom-left) ─────────────────────────────────────────
+
+static void drawFactionListPanel(const game::GameState &state) {
+    const auto &allFactions = state.factionRegistry().allFactions();
+    if (allFactions.empty()) {
+        return;
+    }
+
+    int numFactions = static_cast<int>(allFactions.size());
+    int panelH = (PANEL_PAD * 2) + PANEL_HEADING_SIZE + 6 + (numFactions * HUD_LINE_H);
+    int panelY = SCREEN_HEIGHT - FACTION_PANEL_Y_OFFSET - panelH;
+
+    DrawRectangleRounded({static_cast<float>(FACTION_PANEL_X - 6), static_cast<float>(panelY - 4),
+                          static_cast<float>(FACTION_PANEL_W), static_cast<float>(panelH)},
+                         0.08F, 4, HUD_BG);
+
+    int x = FACTION_PANEL_X;
+    int y = panelY + PANEL_PAD;
+
+    DrawText("FACTIONS", x, y, PANEL_HEADING_SIZE, PANEL_HEADING_COL);
+    y += PANEL_HEADING_SIZE + 6;
+
+    for (const auto &faction : allFactions) {
+        // Draw colored dot.
+        Color dotColor = engine::faction_colors::factionColor(faction.type(), faction.colorIndex());
+        DrawRectangle(x, y + 4, FACTION_DOT_SIZE, FACTION_DOT_SIZE, dotColor);
+
+        // Draw faction name.
+        int textX = x + FACTION_DOT_SIZE + FACTION_DOT_GAP;
+        DrawText(faction.name().c_str(), textX, y, HUD_TEXT_SIZE, PANEL_TEXT_COL);
+
+        // Draw diplomacy relation to player (skip for the player's own faction).
+        if (faction.id() != PLAYER_FACTION_ID) {
+            auto relation = state.diplomacy().getRelation(PLAYER_FACTION_ID, faction.id());
+            Color dipColor = engine::diplomacy_colors::diplomacyColor(relation);
+            const char *dipLabel = engine::diplomacy_colors::diplomacyLabel(relation);
+            int nameW = MeasureText(faction.name().c_str(), HUD_TEXT_SIZE);
+            DrawText(dipLabel, textX + nameW + 8, y + 2, PANEL_KEY_SIZE, dipColor);
+        } else {
+            int nameW = MeasureText(faction.name().c_str(), HUD_TEXT_SIZE);
+            DrawText("(You)", textX + nameW + 8, y + 2, PANEL_KEY_SIZE, HUD_DIM_COL);
+        }
+
+        y += HUD_LINE_H;
     }
 }
 
 // ── City info panel ──────────────────────────────────────────────────────────
 
-static void drawCityPanel(const game::City &city, std::optional<engine::hex::TileCoord> hoveredTile) {
+static void drawCityPanel(const game::City &city, const game::GameState &state,
+                          std::optional<engine::hex::TileCoord> hoveredTile) {
     int contentW = PANEL_W - (PANEL_PAD * 2);
     int x = PANEL_X + PANEL_PAD;
+
+    // Count garrison units in city territory.
+    int garrisonCount = 0;
+    for (const auto &unit : state.units()) {
+        if (unit->isAlive() && city.containsTile(unit->row(), unit->col())) {
+            ++garrisonCount;
+        }
+    }
 
     // Measure panel height dynamically
     int panelH = PANEL_PAD;                              // top padding
     panelH += PANEL_TITLE_SIZE + 8;                      // city name + gap
     panelH += 1 + PANEL_SECTION_GAP;                     // separator
+    panelH += PANEL_LINE_H;                              // faction line
     panelH += PANEL_LINE_H * 3;                          // stats: population, territory, production
+    panelH += PANEL_LINE_H;                              // garrison line
     panelH += PANEL_SECTION_GAP + 1 + PANEL_SECTION_GAP; // separator
-    panelH += PANEL_HEADING_SIZE + 6;                    // "BUILD QUEUE" heading
+
+    panelH += PANEL_HEADING_SIZE + 6; // "BUILD QUEUE" heading
 
     const auto &bq = city.buildQueue();
     if (bq.isEmpty()) {
@@ -209,13 +338,34 @@ static void drawCityPanel(const game::City &city, std::optional<engine::hex::Til
 
     // ── City Name ────────────────────────────────────────────────────────
     DrawText(city.name().c_str(), x, y, PANEL_TITLE_SIZE, PANEL_TITLE_COL);
-    std::string factionStr = "Faction " + std::to_string(city.factionId());
-    int factionW = MeasureText(factionStr.c_str(), PANEL_KEY_SIZE);
-    DrawText(factionStr.c_str(), PANEL_X + PANEL_W - PANEL_PAD - factionW, y + 4, PANEL_KEY_SIZE, PANEL_DIM_COL);
     y += PANEL_TITLE_SIZE + 8;
 
     drawSeparator(x, y, contentW);
     y += 1 + PANEL_SECTION_GAP;
+
+    // ── Owning faction ──────────────────────────────────────────────────
+    const auto *cityFaction = state.factionRegistry().findFaction(static_cast<game::FactionId>(city.factionId()));
+    if (cityFaction != nullptr) {
+        Color factionColor = engine::faction_colors::factionColor(cityFaction->type(), cityFaction->colorIndex());
+        // Draw colored dot + faction name.
+        DrawRectangle(x, y + 4, FACTION_DOT_SIZE, FACTION_DOT_SIZE, factionColor);
+        std::string factionNameStr = cityFaction->name();
+        DrawText(factionNameStr.c_str(), x + FACTION_DOT_SIZE + FACTION_DOT_GAP, y, PANEL_TEXT_SIZE, PANEL_TEXT_COL);
+
+        // Show diplomacy relation if foreign city.
+        auto cityFactionId = static_cast<game::FactionId>(city.factionId());
+        if (cityFactionId != PLAYER_FACTION_ID) {
+            auto relation = state.diplomacy().getRelation(PLAYER_FACTION_ID, cityFactionId);
+            Color dipColor = engine::diplomacy_colors::diplomacyColor(relation);
+            const char *dipLabel = engine::diplomacy_colors::diplomacyLabel(relation);
+            int nameW = MeasureText(factionNameStr.c_str(), PANEL_TEXT_SIZE);
+            DrawText(dipLabel, x + FACTION_DOT_SIZE + FACTION_DOT_GAP + nameW + 8, y + 2, PANEL_KEY_SIZE, dipColor);
+        }
+    } else {
+        std::string factionStr = "Faction " + std::to_string(city.factionId());
+        DrawText(factionStr.c_str(), x, y, PANEL_TEXT_SIZE, PANEL_DIM_COL);
+    }
+    y += PANEL_LINE_H;
 
     // ── Stats ────────────────────────────────────────────────────────────
     std::string popStr = "Population    " + std::to_string(city.population());
@@ -228,6 +378,12 @@ static void drawCityPanel(const game::City &city, std::optional<engine::hex::Til
 
     std::string prodStr = "Production    " + std::to_string(game::City::productionPerTurn()) + "/turn";
     DrawText(prodStr.c_str(), x, y, PANEL_TEXT_SIZE, PANEL_TEXT_COL);
+    y += PANEL_LINE_H;
+
+    // ── Garrison ────────────────────────────────────────────────────────
+    std::string garrisonStr =
+        "Garrison      " + std::to_string(garrisonCount) + " unit" + (garrisonCount != 1 ? "s" : "");
+    DrawText(garrisonStr.c_str(), x, y, PANEL_TEXT_SIZE, PANEL_TEXT_COL);
     y += PANEL_LINE_H;
 
     y += PANEL_SECTION_GAP;
@@ -355,6 +511,12 @@ static void processTurn(game::GameState &state) {
         totalYield += building.yieldPerTurn();
     }
     state.factionResources() += totalYield;
+
+    // Also add yields to the player faction's stockpile.
+    auto *playerFaction = state.mutableFactionRegistry().findMutableFaction(PLAYER_FACTION_ID);
+    if (playerFaction != nullptr) {
+        playerFaction->addResources(totalYield);
+    }
 }
 
 // ── Save / Load ─────────────────────────────────────────────────────────
@@ -421,8 +583,9 @@ int main() {
 
         BeginMode3D(cam);
         engine::drawMap(state.map(), hoveredTile);
-        engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit);
-        engine::drawCities(state.cities(), state.factionRegistry(), selectedCity);
+        engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit, PLAYER_FACTION_ID, &state.diplomacy());
+        engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID,
+                           &state.diplomacy());
         engine::drawBuildings(state.buildings());
         EndMode3D();
 
@@ -431,11 +594,13 @@ int main() {
         if (selectedCity) {
             for (const auto &city : state.cities()) {
                 if (city.id() == *selectedCity) {
-                    drawCityPanel(city, hoveredTile);
+                    drawCityPanel(city, state, hoveredTile);
                     break;
                 }
             }
         }
+
+        drawFactionListPanel(state);
 
         handleSaveLoad(state, selectedUnit);
 
