@@ -53,11 +53,12 @@ TEST(SerializationTest, MapTerrainRoundTrip) {
 }
 
 TEST(SerializationTest, AllTerrainTypesRoundTrip) {
-    game::GameState state(10, 10, 99);
+    game::GameState state(20, 20, 99);
 
     bool hasPlains = false, hasHills = false, hasForest = false, hasWater = false, hasMountain = false;
-    for (int r = 0; r < 10; ++r) {
-        for (int c = 0; c < 10; ++c) {
+    bool hasDesert = false, hasSwamp = false;
+    for (int r = 0; r < 20; ++r) {
+        for (int c = 0; c < 20; ++c) {
             switch (state.map().tile(r, c).terrainType()) {
             case game::TerrainType::Plains:
                 hasPlains = true;
@@ -74,6 +75,12 @@ TEST(SerializationTest, AllTerrainTypesRoundTrip) {
             case game::TerrainType::Mountain:
                 hasMountain = true;
                 break;
+            case game::TerrainType::Desert:
+                hasDesert = true;
+                break;
+            case game::TerrainType::Swamp:
+                hasSwamp = true;
+                break;
             }
         }
     }
@@ -82,12 +89,14 @@ TEST(SerializationTest, AllTerrainTypesRoundTrip) {
     ASSERT_TRUE(hasForest) << "Test setup: seed 99 should produce Forest tiles";
     ASSERT_TRUE(hasWater) << "Test setup: seed 99 should produce Water tiles";
     ASSERT_TRUE(hasMountain) << "Test setup: seed 99 should produce Mountain tiles";
+    ASSERT_TRUE(hasDesert) << "Test setup: seed 99 should produce Desert tiles";
+    ASSERT_TRUE(hasSwamp) << "Test setup: seed 99 should produce Swamp tiles";
 
     std::string data = game::serializeGameState(state);
     game::GameState restored = game::deserializeGameState(data);
 
-    for (int r = 0; r < 10; ++r) {
-        for (int c = 0; c < 10; ++c) {
+    for (int r = 0; r < 20; ++r) {
+        for (int c = 0; c < 20; ++c) {
             EXPECT_EQ(restored.map().tile(r, c).terrainType(), state.map().tile(r, c).terrainType())
                 << "Terrain mismatch at (" << r << ", " << c << ")";
         }

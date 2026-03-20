@@ -36,6 +36,8 @@ TEST(BuildingTest, NoTerrainRestrictionAllowsAll) {
     EXPECT_TRUE(building.canBuildOn(game::TerrainType::Forest));
     EXPECT_TRUE(building.canBuildOn(game::TerrainType::Water));
     EXPECT_TRUE(building.canBuildOn(game::TerrainType::Mountain));
+    EXPECT_TRUE(building.canBuildOn(game::TerrainType::Desert));
+    EXPECT_TRUE(building.canBuildOn(game::TerrainType::Swamp));
 }
 
 TEST(BuildingTest, TerrainRestrictionEnforced) {
