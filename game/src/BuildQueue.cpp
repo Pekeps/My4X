@@ -8,7 +8,19 @@ void BuildQueue::enqueue(BuildingFactory factory, int targetRow, int targetCol) 
                                .productionCost = prototype.constructionCost().production,
                                .targetRow = targetRow,
                                .targetCol = targetCol,
-                               .factory = std::move(factory)});
+                               .orderType = BuildOrderType::Building,
+                               .factory = std::move(factory),
+                               .templateKey = {}});
+}
+
+void BuildQueue::enqueueUnit(const std::string &templateKey, int productionCost) {
+    queue_.push(BuildQueueItem{.name = templateKey,
+                               .productionCost = productionCost,
+                               .targetRow = 0,
+                               .targetCol = 0,
+                               .orderType = BuildOrderType::Unit,
+                               .factory = nullptr,
+                               .templateKey = templateKey});
 }
 
 std::optional<BuildQueueItem> BuildQueue::currentItem() const {
@@ -28,17 +40,22 @@ int BuildQueue::turnsRemaining(int productionPerTurn) const {
 
 int BuildQueue::accumulatedProduction() const { return accumulated_; }
 
-std::optional<Building> BuildQueue::applyProduction(int amount) {
+std::optional<BuildQueueResult> BuildQueue::applyProduction(int amount) {
     if (queue_.empty()) {
         return std::nullopt;
     }
     accumulated_ += amount;
     const auto &item = queue_.front();
     if (accumulated_ >= item.productionCost) {
-        auto building = item.factory(item.targetRow, item.targetCol);
+        std::optional<BuildQueueResult> result;
+        if (item.orderType == BuildOrderType::Unit) {
+            result = BuildQueueResult{UnitSpawnRequest{.templateKey = item.templateKey}};
+        } else {
+            result = BuildQueueResult{item.factory(item.targetRow, item.targetCol)};
+        }
         queue_.pop();
         accumulated_ = 0;
-        return building;
+        return result;
     }
     return std::nullopt;
 }

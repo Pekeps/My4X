@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 // ── Screen & map ─────────────────────────────────────────────────────────────
@@ -343,8 +344,8 @@ static void processTurn(game::GameState &state) {
     for (auto &city : state.cities()) {
         int prod = game::City::productionPerTurn();
         auto completed = city.buildQueue().applyProduction(prod);
-        if (completed) {
-            state.addBuilding(std::move(*completed));
+        if (completed && std::holds_alternative<game::Building>(*completed)) {
+            state.addBuilding(std::move(std::get<game::Building>(*completed)));
         }
     }
 

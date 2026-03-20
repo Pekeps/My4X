@@ -1,11 +1,18 @@
 syntax = "proto3";
 package game_proto;
 
+enum BuildOrderType {
+  BUILD_ORDER_BUILDING = 0;
+  BUILD_ORDER_UNIT = 1;
+}
+
 message BuildQueueItem {
   string name = 1;
   int32 production_cost = 2;
   int32 target_row = 3;
   int32 target_col = 4;
+  BuildOrderType order_type = 5;
+  string template_key = 6;
 }
 
 message City {

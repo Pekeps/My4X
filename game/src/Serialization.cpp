@@ -158,6 +158,12 @@ std::string serializeGameState(const GameState &state) {
             protoItem->set_production_cost(item.productionCost);
             protoItem->set_target_row(item.targetRow);
             protoItem->set_target_col(item.targetCol);
+            if (item.orderType == BuildOrderType::Unit) {
+                protoItem->set_order_type(game_proto::BUILD_ORDER_UNIT);
+                protoItem->set_template_key(item.templateKey);
+            } else {
+                protoItem->set_order_type(game_proto::BUILD_ORDER_BUILDING);
+            }
         }
     }
 
@@ -244,7 +250,14 @@ GameState deserializeGameState(const std::string &data) {
             item.productionCost = protoItem.production_cost();
             item.targetRow = protoItem.target_row();
             item.targetCol = protoItem.target_col();
-            item.factory = buildingFactoryByName(protoItem.name());
+            if (protoItem.order_type() == game_proto::BUILD_ORDER_UNIT) {
+                item.orderType = BuildOrderType::Unit;
+                item.templateKey = protoItem.template_key();
+                item.factory = nullptr;
+            } else {
+                item.orderType = BuildOrderType::Building;
+                item.factory = buildingFactoryByName(protoItem.name());
+            }
             bq.restoreItem(std::move(item));
         }
         bq.setAccumulatedProduction(protoCity.accumulated_production());
