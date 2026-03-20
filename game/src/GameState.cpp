@@ -137,6 +137,12 @@ const FactionRegistry &GameState::factionRegistry() const { return factionRegist
 
 FactionRegistry &GameState::mutableFactionRegistry() { return factionRegistry_; }
 
+// -- DiplomacyManager --------------------------------------------------
+
+const DiplomacyManager &GameState::diplomacy() const { return diplomacy_; }
+
+DiplomacyManager &GameState::mutableDiplomacy() { return diplomacy_; }
+
 // -- Faction resources -------------------------------------------------
 
 const Resource &GameState::factionResources() const { return factionResources_; }
