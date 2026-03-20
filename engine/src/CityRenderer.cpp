@@ -17,8 +17,17 @@ static constexpr int CITY_MARKER_SLICES = 8;
 
 void drawCities(const std::vector<game::City> &cities, const game::FactionRegistry &factions,
                 std::optional<game::CityId> selectedCityId, game::FactionId playerFactionId,
-                const game::DiplomacyManager *diplomacy) {
+                const game::DiplomacyManager *diplomacy, const game::FogOfWar *fog) {
     for (const auto &city : cities) {
+        // Hide enemy cities on non-Visible tiles (fog of war).
+        auto cityFactionIdVal = static_cast<game::FactionId>(city.factionId());
+        if (fog != nullptr && cityFactionIdVal != playerFactionId) {
+            auto vis = fog->getVisibility(playerFactionId, city.centerRow(), city.centerCol());
+            if (vis != game::VisibilityState::Visible) {
+                continue;
+            }
+        }
+
         const bool selected = selectedCityId && city.id() == *selectedCityId;
 
         // Default to GOLD marker; faction lookup may override both fill and marker.

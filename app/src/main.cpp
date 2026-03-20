@@ -139,6 +139,9 @@ static void setupDemoState(game::GameState &state) {
 
     // Spawn neutral factions (hostile + passive) with units and diplomacy.
     game::NeutralAI::spawnNeutralFactions(state);
+
+    // Calculate initial fog of war for the player faction.
+    state.recalculateFog(playerId);
 }
 
 // ── City click detection ─────────────────────────────────────────────────────
@@ -561,6 +564,9 @@ static void processTurn(game::GameState &state) {
     if (playerFaction != nullptr) {
         playerFaction->addResources(totalYield);
     }
+
+    // Recalculate fog of war at turn start (unit positions may have changed).
+    state.recalculateFog(PLAYER_FACTION_ID);
 }
 
 // ── Save / Load ─────────────────────────────────────────────────────────
@@ -580,6 +586,7 @@ static void handleSaveLoad(game::GameState &state, int &selectedUnit) {
             auto path = game::latestSavePath();
             state = game::loadGame(path);
             selectedUnit = NO_SELECTION;
+            state.recalculateFog(PLAYER_FACTION_ID);
             TraceLog(LOG_INFO, "Game loaded: %s", path.c_str());
         } catch (const std::exception &e) {
             TraceLog(LOG_ERROR, "Failed to load game: %s", e.what());
@@ -690,6 +697,9 @@ static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile
     event.defenderFactionName = defenderFactionName;
     combatLog.append(event);
 
+    // Recalculate fog of war after combat (units may have died).
+    state.recalculateFog(PLAYER_FACTION_ID);
+
     // ── Update selection ─────────────────────────────────────────────────
 
     // If attacker died, deselect.
@@ -712,6 +722,9 @@ static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &ti
     if (!result.executed) {
         return false;
     }
+
+    // Recalculate fog of war after unit movement.
+    state.recalculateFog(PLAYER_FACTION_ID);
 
     // After movement, attempt city capture.
     game::CaptureAction captureAction(static_cast<std::size_t>(selectedUnit));
@@ -857,7 +870,8 @@ static void renderFrame(const game::GameState &state, Camera3D cam,
     engine::window::beginFrame();
 
     BeginMode3D(cam);
-    engine::drawMap(state.map(), hoveredTile);
+    const auto *fog = &state.fogOfWar();
+    engine::drawMap(state.map(), hoveredTile, fog, PLAYER_FACTION_ID);
 
     // Draw attack range overlay for selected ranged unit.
     if (selectedUnit != NO_SELECTION) {
@@ -867,9 +881,10 @@ static void renderFrame(const game::GameState &state, Camera3D cam,
         }
     }
 
-    engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit, PLAYER_FACTION_ID, &state.diplomacy());
-    engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy());
-    engine::drawBuildings(state.buildings());
+    engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit, PLAYER_FACTION_ID, &state.diplomacy(), fog);
+    engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy(),
+                       fog);
+    engine::drawBuildings(state.buildings(), fog, PLAYER_FACTION_ID);
 
     // Draw 3D combat effects (hit flashes and death effects).
     effects.drawHitFlashes();

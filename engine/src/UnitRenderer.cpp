@@ -34,11 +34,20 @@ static constexpr float LEVEL_PIP_SPREAD = 0.15F;
 static constexpr float PIP_CENTER_DIVISOR = 2.0F;
 
 void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game::FactionRegistry &factions,
-               int selectedIndex, game::FactionId playerFactionId, const game::DiplomacyManager *diplomacy) {
+               int selectedIndex, game::FactionId playerFactionId, const game::DiplomacyManager *diplomacy,
+               const game::FogOfWar *fog) {
     for (std::size_t i = 0; i < units.size(); ++i) {
         const auto &unit = units.at(i);
         if (!unit->isAlive()) {
             continue;
+        }
+
+        // Hide enemy units on non-Visible tiles (fog of war).
+        if (fog != nullptr && unit->factionId() != playerFactionId) {
+            auto vis = fog->getVisibility(playerFactionId, unit->row(), unit->col());
+            if (vis != game::VisibilityState::Visible) {
+                continue;
+            }
         }
 
         // Look up faction color for this unit.
