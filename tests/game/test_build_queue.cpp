@@ -1,5 +1,6 @@
 #include "game/BuildQueue.h"
 #include <gtest/gtest.h>
+#include <variant>
 
 using namespace game;
 
@@ -39,7 +40,8 @@ TEST(BuildQueueTest, ApplyProductionCompletesBuilding) {
     EXPECT_FALSE(partial.has_value());
     auto completed = bq.applyProduction(5);
     ASSERT_TRUE(completed.has_value());
-    EXPECT_EQ(completed->name(), "Farm");
+    ASSERT_TRUE(std::holds_alternative<Building>(*completed));
+    EXPECT_EQ(std::get<Building>(*completed).name(), "Farm");
     EXPECT_TRUE(bq.isEmpty());
     EXPECT_EQ(bq.accumulatedProduction(), 0);
 }
@@ -101,7 +103,8 @@ TEST(BuildQueueTest, MineCompletesAtCorrectCost) {
     EXPECT_FALSE(partial.has_value());
     auto completed = bq.applyProduction(1);
     ASSERT_TRUE(completed.has_value());
-    EXPECT_EQ(completed->name(), "Mine");
+    ASSERT_TRUE(std::holds_alternative<Building>(*completed));
+    EXPECT_EQ(std::get<Building>(*completed).name(), "Mine");
     EXPECT_TRUE(bq.isEmpty());
 }
 
@@ -113,7 +116,8 @@ TEST(BuildQueueTest, MarketCompletesAtCorrectCost) {
     EXPECT_FALSE(partial.has_value());
     auto completed = bq.applyProduction(1);
     ASSERT_TRUE(completed.has_value());
-    EXPECT_EQ(completed->name(), "Market");
+    ASSERT_TRUE(std::holds_alternative<Building>(*completed));
+    EXPECT_EQ(std::get<Building>(*completed).name(), "Market");
     EXPECT_TRUE(bq.isEmpty());
 }
 
