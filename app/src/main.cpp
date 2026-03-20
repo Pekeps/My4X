@@ -9,6 +9,7 @@
 #include "engine/MapRenderer.h"
 #include "engine/UnitRenderer.h"
 #include "engine/Window.h"
+#include "game/AttackAction.h"
 #include "game/BuildQueue.h"
 #include "game/Building.h"
 #include "game/City.h"
@@ -543,6 +544,229 @@ static void handleSaveLoad(game::GameState &state, int &selectedUnit) {
     }
 }
 
+// ── Combat flash feedback ─────────────────────────────────────────────────────
+
+struct CombatFlash {
+    int row = -1;
+    int col = -1;
+    float timer = 0.0F;
+};
+
+const float COMBAT_FLASH_DURATION = 0.5F;
+
+static void drawCombatFlash(const CombatFlash &flash) {
+    if (flash.timer <= 0.0F) {
+        return;
+    }
+    Vector3 center = engine::hex::tileCenter(flash.row, flash.col);
+    float alpha = flash.timer / COMBAT_FLASH_DURATION;
+    Color flashColor = {255, 60, 60, static_cast<unsigned char>(alpha * 180.0F)};
+    DrawSphere(center, 0.6F, flashColor);
+}
+
+// ── Unit click handling (select / attack) ────────────────────────────────────
+
+/// Find the index of the first alive unit at the given tile.
+static int findUnitAtTile(const game::GameState &state, int row, int col) {
+    const auto &units = state.units();
+    for (std::size_t i = 0; i < units.size(); ++i) {
+        if (units[i]->isAlive() && units[i]->row() == row && units[i]->col() == col) {
+            return static_cast<int>(i);
+        }
+    }
+    return NO_SELECTION;
+}
+
+/// Try to execute an attack from selectedUnit to clickedUnit.
+/// Updates combat flash and selectedUnit as needed.
+/// Returns true if an attack was successfully executed.
+static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit, int clickedUnit,
+                      CombatFlash &attackerFlash, CombatFlash &defenderFlash) {
+    auto &units = state.units();
+    auto &sel = units[selectedUnit];
+    auto &target = units[clickedUnit];
+
+    bool isEnemy =
+        target->factionId() != sel->factionId() && state.diplomacy().areAtWar(sel->factionId(), target->factionId());
+    if (!isEnemy) {
+        return false;
+    }
+
+    game::AttackAction action(static_cast<std::size_t>(selectedUnit), static_cast<std::size_t>(clickedUnit));
+    auto result = action.execute(state);
+    if (!result.executed) {
+        return false;
+    }
+
+    // Set up combat flash on the tiles that were involved.
+    defenderFlash = {.row = tile.row, .col = tile.col, .timer = COMBAT_FLASH_DURATION};
+    if (result.combat.damageToAttacker > 0) {
+        attackerFlash = {.row = sel->row(), .col = sel->col(), .timer = COMBAT_FLASH_DURATION};
+    }
+
+    // If attacker died, deselect.
+    if (result.combat.attackerDied) {
+        selectedUnit = NO_SELECTION;
+    } else if (result.combat.defenderDied &&
+               static_cast<std::size_t>(clickedUnit) < static_cast<std::size_t>(selectedUnit)) {
+        // Defender had a lower index and was removed — our index shifted down.
+        --selectedUnit;
+    }
+    return true;
+}
+
+/// Try to move the selected unit to the clicked tile (adjacent, empty).
+/// Returns true if movement occurred.
+static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &tile, int selectedUnit) {
+    auto &sel = state.units()[selectedUnit];
+    if (sel->movementRemaining() <= 0) {
+        return false;
+    }
+    int dist = game::AttackAction::hexDistance(sel->row(), sel->col(), tile.row, tile.col);
+    if (dist != 1) {
+        return false;
+    }
+    state.mutableRegistry().unregisterUnit(sel->row(), sel->col(), sel.get());
+    sel->moveTo(tile.row, tile.col);
+    state.mutableRegistry().registerUnit(sel->row(), sel->col(), sel.get());
+    return true;
+}
+
+/// Handle click when a unit is already selected.
+/// Returns true if the click was consumed.
+static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit,
+                                    int clickedUnit, CombatFlash &attackerFlash, CombatFlash &defenderFlash) {
+    auto &units = state.units();
+    auto &sel = units[selectedUnit];
+
+    // Only handle actions for player-owned units.
+    if (sel->factionId() != PLAYER_FACTION_ID) {
+        if (clickedUnit != NO_SELECTION) {
+            selectedUnit = clickedUnit;
+            return true;
+        }
+        selectedUnit = NO_SELECTION;
+        return false;
+    }
+
+    // Click on another unit — try attack or switch selection.
+    if (clickedUnit != NO_SELECTION && clickedUnit != selectedUnit) {
+        if (tryAttack(state, tile, selectedUnit, clickedUnit, attackerFlash, defenderFlash)) {
+            return true;
+        }
+        // Click on a friendly unit — select it instead.
+        auto &target = units[clickedUnit];
+        if (target->factionId() == sel->factionId()) {
+            selectedUnit = clickedUnit;
+            return true;
+        }
+    }
+
+    // Click on empty tile — try to move.
+    if (clickedUnit == NO_SELECTION && tryMoveUnit(state, tile, selectedUnit)) {
+        return true;
+    }
+
+    // Click on same tile — deselect.
+    if (clickedUnit == selectedUnit) {
+        selectedUnit = NO_SELECTION;
+        return true;
+    }
+
+    return false;
+}
+
+/// Handle a left-click on a tile for unit selection, movement, or attack.
+/// Returns true if the click was consumed by unit logic.
+static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit,
+                            CombatFlash &attackerFlash, CombatFlash &defenderFlash) {
+    int clickedUnit = findUnitAtTile(state, tile.row, tile.col);
+
+    if (selectedUnit != NO_SELECTION) {
+        auto &units = state.units();
+        if (static_cast<std::size_t>(selectedUnit) >= units.size() || !units[selectedUnit]->isAlive()) {
+            selectedUnit = NO_SELECTION;
+            return false;
+        }
+        return handleSelectedUnitClick(state, tile, selectedUnit, clickedUnit, attackerFlash, defenderFlash);
+    }
+
+    // No unit selected — try to select one.
+    if (clickedUnit != NO_SELECTION) {
+        selectedUnit = clickedUnit;
+        return true;
+    }
+
+    return false;
+}
+
+// ── Input handling ────────────────────────────────────────────────────────────
+
+static void handleInput(game::GameState &state, const std::optional<engine::hex::TileCoord> &hoveredTile,
+                        int &selectedUnit, std::optional<game::CityId> &selectedCity, CombatFlash &attackerFlash,
+                        CombatFlash &defenderFlash) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hoveredTile) {
+        bool unitHandled = handleUnitClick(state, *hoveredTile, selectedUnit, attackerFlash, defenderFlash);
+        if (!unitHandled) {
+            handleCityClick(state.cities(), *hoveredTile, selectedCity);
+        }
+    }
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || IsKeyPressed(KEY_ESCAPE)) {
+        selectedUnit = NO_SELECTION;
+        selectedCity = std::nullopt;
+    }
+
+    if (selectedCity) {
+        handleBuildActions(state, *selectedCity, hoveredTile);
+    }
+
+    if (IsKeyPressed(KEY_SPACE)) {
+        processTurn(state);
+    }
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────────
+
+static void renderFrame(const game::GameState &state, Camera3D cam,
+                        const std::optional<engine::hex::TileCoord> &hoveredTile, int selectedUnit,
+                        std::optional<game::CityId> selectedCity, const CombatFlash &attackerFlash,
+                        const CombatFlash &defenderFlash) {
+    engine::window::beginFrame();
+
+    BeginMode3D(cam);
+    engine::drawMap(state.map(), hoveredTile);
+    engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit, PLAYER_FACTION_ID, &state.diplomacy());
+    engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy());
+    engine::drawBuildings(state.buildings());
+    drawCombatFlash(attackerFlash);
+    drawCombatFlash(defenderFlash);
+    EndMode3D();
+
+    drawTopHud(state, selectedUnit);
+
+    if (selectedCity) {
+        for (const auto &city : state.cities()) {
+            if (city.id() == *selectedCity) {
+                drawCityPanel(city, state, hoveredTile);
+                break;
+            }
+        }
+    }
+
+    drawFactionListPanel(state);
+
+    engine::window::endFrame();
+}
+
+// ── Update combat flash timers ───────────────────────────────────────────────
+
+static void updateFlashTimer(CombatFlash &flash, float dt) {
+    if (flash.timer > 0.0F) {
+        flash.timer -= dt;
+    }
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {
@@ -553,6 +777,8 @@ int main() {
 
     int selectedUnit = NO_SELECTION;
     std::optional<game::CityId> selectedCity;
+    CombatFlash attackerFlash;
+    CombatFlash defenderFlash;
 
     setupDemoState(state);
 
@@ -560,51 +786,15 @@ int main() {
         camera.update();
         Camera3D cam = camera.raw();
         auto hoveredTile = engine::input::mouseToTile(cam, MAP_ROWS, MAP_COLS);
+        float dt = GetFrameTime();
 
-        // ── Input ────────────────────────────────────────────────────────
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hoveredTile) {
-            handleCityClick(state.cities(), *hoveredTile, selectedCity);
-        }
+        updateFlashTimer(attackerFlash, dt);
+        updateFlashTimer(defenderFlash, dt);
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || IsKeyPressed(KEY_ESCAPE)) {
-            selectedCity = std::nullopt;
-        }
-
-        if (selectedCity) {
-            handleBuildActions(state, *selectedCity, hoveredTile);
-        }
-
-        if (IsKeyPressed(KEY_SPACE)) {
-            processTurn(state);
-        }
-
-        // ── Render ───────────────────────────────────────────────────────
-        engine::window::beginFrame();
-
-        BeginMode3D(cam);
-        engine::drawMap(state.map(), hoveredTile);
-        engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit, PLAYER_FACTION_ID, &state.diplomacy());
-        engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID,
-                           &state.diplomacy());
-        engine::drawBuildings(state.buildings());
-        EndMode3D();
-
-        drawTopHud(state, selectedUnit);
-
-        if (selectedCity) {
-            for (const auto &city : state.cities()) {
-                if (city.id() == *selectedCity) {
-                    drawCityPanel(city, state, hoveredTile);
-                    break;
-                }
-            }
-        }
-
-        drawFactionListPanel(state);
-
+        handleInput(state, hoveredTile, selectedUnit, selectedCity, attackerFlash, defenderFlash);
         handleSaveLoad(state, selectedUnit);
 
-        engine::window::endFrame();
+        renderFrame(state, cam, hoveredTile, selectedUnit, selectedCity, attackerFlash, defenderFlash);
     }
 
     engine::window::shutdown();
