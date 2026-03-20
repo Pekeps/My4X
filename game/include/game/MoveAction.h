@@ -17,6 +17,7 @@ enum class MoveValidation : std::uint8_t {
     ImpassableTerrain,
     InsufficientMovement,
     DestinationOccupied,
+    BlockedByZoneOfControl,
 };
 
 /// Result of executing a move action.

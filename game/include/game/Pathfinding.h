@@ -1,5 +1,6 @@
 #pragma once
 
+#include "game/DiplomacyManager.h"
 #include "game/Faction.h"
 #include "game/Map.h"
 #include "game/TileCoord.h"
@@ -66,5 +67,24 @@ struct ReachableTile {
 [[nodiscard]] std::vector<ReachableTile> computeMovementRange(int startRow, int startCol, int movementBudget,
                                                               const Map &map, const TileRegistry &registry,
                                                               FactionId factionId);
+
+/// Find the optimal path from start to goal respecting zone-of-control rules.
+///
+/// Behaves like findPath() but additionally:
+///   - Entering an enemy ZoC hex forces the unit to stop (the path ends there).
+///   - Moving directly from one ZoC hex to another ZoC hex of the same enemy
+///     is forbidden.
+///
+/// @param startRow    Starting tile row.
+/// @param startCol    Starting tile column.
+/// @param goalRow     Destination tile row.
+/// @param goalCol     Destination tile column.
+/// @param map         The game map (for terrain lookups).
+/// @param registry    Tile registry (for unit occupancy checks).
+/// @param factionId   Faction of the moving unit.
+/// @param diplomacy   Diplomacy manager (for war/peace checks).
+[[nodiscard]] std::vector<TileCoord> findPathWithZoc(int startRow, int startCol, int goalRow, int goalCol,
+                                                     const Map &map, const TileRegistry &registry, FactionId factionId,
+                                                     const DiplomacyManager &diplomacy);
 
 } // namespace game
