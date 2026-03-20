@@ -7,6 +7,9 @@ add_library(my4x_engine STATIC
     src/BuildingRenderer.cpp
     src/Camera.cpp
     src/Input.cpp
+    src/CombatEffects.cpp
+    src/CombatLogRenderer.cpp
+    src/RangeOverlay.cpp
 )
 
 target_include_directories(my4x_engine PUBLIC include)

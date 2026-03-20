@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace game {
@@ -44,6 +45,16 @@ struct CombatEvent {
 
     /// Terrain the defender was standing on (provides context for defense bonuses).
     TerrainType defenderTerrain = TerrainType::Plains;
+
+    /// Display name of the attacking unit (captured at combat time for log display).
+    std::string attackerName;
+    /// Display name of the defending unit (captured at combat time for log display).
+    std::string defenderName;
+
+    /// Display name of the attacker's faction (captured at combat time for log display).
+    std::string attackerFactionName;
+    /// Display name of the defender's faction (captured at combat time for log display).
+    std::string defenderFactionName;
 };
 
 /// Bounded combat log that stores a fixed maximum number of events.

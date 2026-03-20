@@ -3,16 +3,21 @@
 #include "engine/BuildingRenderer.h"
 #include "engine/Camera.h"
 #include "engine/CityRenderer.h"
+#include "engine/CombatEffects.h"
+#include "engine/CombatLogRenderer.h"
 #include "engine/DiplomacyColors.h"
 #include "engine/FactionColors.h"
+#include "engine/HexGrid.h"
 #include "engine/Input.h"
 #include "engine/MapRenderer.h"
+#include "engine/RangeOverlay.h"
 #include "engine/UnitRenderer.h"
 #include "engine/Window.h"
 #include "game/AttackAction.h"
 #include "game/BuildQueue.h"
 #include "game/Building.h"
 #include "game/City.h"
+#include "game/CombatLog.h"
 #include "game/DiplomacyManager.h"
 #include "game/Faction.h"
 #include "game/FactionRegistry.h"
@@ -93,6 +98,15 @@ const int FACTION_DOT_GAP = 6;
 // ── Player faction ID (first registered faction) ────────────────────────────
 
 const game::FactionId PLAYER_FACTION_ID = 1;
+
+// ── Damage number colors ─────────────────────────────────────────────────────
+
+const Color DAMAGE_COLOR_NORMAL = {255, 80, 80, 255};
+const Color DAMAGE_COLOR_COUNTER = {255, 180, 60, 255};
+
+// ── Damage number Y spawn offset ─────────────────────────────────────────────
+
+const float DAMAGE_NUMBER_SPAWN_Y = 1.2F;
 
 // ── Demo setup ───────────────────────────────────────────────────────────────
 
@@ -553,26 +567,6 @@ static void handleSaveLoad(game::GameState &state, int &selectedUnit) {
     }
 }
 
-// ── Combat flash feedback ─────────────────────────────────────────────────────
-
-struct CombatFlash {
-    int row = -1;
-    int col = -1;
-    float timer = 0.0F;
-};
-
-const float COMBAT_FLASH_DURATION = 0.5F;
-
-static void drawCombatFlash(const CombatFlash &flash) {
-    if (flash.timer <= 0.0F) {
-        return;
-    }
-    Vector3 center = engine::hex::tileCenter(flash.row, flash.col);
-    float alpha = flash.timer / COMBAT_FLASH_DURATION;
-    Color flashColor = {255, 60, 60, static_cast<unsigned char>(alpha * 180.0F)};
-    DrawSphere(center, 0.6F, flashColor);
-}
-
 // ── Unit click handling (select / attack) ────────────────────────────────────
 
 /// Find the index of the first alive unit at the given tile.
@@ -587,10 +581,10 @@ static int findUnitAtTile(const game::GameState &state, int row, int col) {
 }
 
 /// Try to execute an attack from selectedUnit to clickedUnit.
-/// Updates combat flash and selectedUnit as needed.
+/// Spawns combat effects and logs the combat event.
 /// Returns true if an attack was successfully executed.
 static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit, int clickedUnit,
-                      CombatFlash &attackerFlash, CombatFlash &defenderFlash) {
+                      engine::CombatEffectManager &effects, game::CombatLog &combatLog) {
     auto &units = state.units();
     auto &sel = units[selectedUnit];
     auto &target = units[clickedUnit];
@@ -601,17 +595,82 @@ static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile
         return false;
     }
 
+    // Capture unit info before combat (units may die during execute).
+    std::string attackerName = sel->name();
+    std::string defenderName = target->name();
+    game::FactionId attackerFactionId = sel->factionId();
+    game::FactionId defenderFactionId = target->factionId();
+    int defenderRow = target->row();
+    int defenderCol = target->col();
+    int attackerRow = sel->row();
+    int attackerCol = sel->col();
+
+    // Look up faction names for the combat log.
+    std::string attackerFactionName;
+    std::string defenderFactionName;
+    const auto *attackerFaction = state.factionRegistry().findFaction(attackerFactionId);
+    if (attackerFaction != nullptr) {
+        attackerFactionName = attackerFaction->name();
+    }
+    const auto *defenderFaction = state.factionRegistry().findFaction(defenderFactionId);
+    if (defenderFaction != nullptr) {
+        defenderFactionName = defenderFaction->name();
+    }
+
     game::AttackAction action(static_cast<std::size_t>(selectedUnit), static_cast<std::size_t>(clickedUnit));
     auto result = action.execute(state);
     if (!result.executed) {
         return false;
     }
 
-    // Set up combat flash on the tiles that were involved.
-    defenderFlash = {.row = tile.row, .col = tile.col, .timer = COMBAT_FLASH_DURATION};
+    // ── Spawn combat visual effects ──────────────────────────────────────
+
+    // Hit flash on defender's tile.
+    effects.spawnHitFlash(defenderRow, defenderCol);
+
+    // Floating damage number on defender.
+    Vector3 defCenter = engine::hex::tileCenter(defenderRow, defenderCol);
+    effects.spawnDamageNumber(defCenter.x, DAMAGE_NUMBER_SPAWN_Y, defCenter.z, result.combat.damageToDefender,
+                              DAMAGE_COLOR_NORMAL);
+
+    // Counter-attack damage number on attacker (if any).
     if (result.combat.damageToAttacker > 0) {
-        attackerFlash = {.row = sel->row(), .col = sel->col(), .timer = COMBAT_FLASH_DURATION};
+        effects.spawnHitFlash(attackerRow, attackerCol);
+        Vector3 atkCenter = engine::hex::tileCenter(attackerRow, attackerCol);
+        effects.spawnDamageNumber(atkCenter.x + engine::COUNTER_DAMAGE_X_OFFSET, DAMAGE_NUMBER_SPAWN_Y, atkCenter.z,
+                                  result.combat.damageToAttacker, DAMAGE_COLOR_COUNTER);
     }
+
+    // Death effects.
+    if (result.combat.defenderDied) {
+        effects.spawnDeathEffect(defCenter.x, engine::DEATH_EFFECT_Y_OFFSET, defCenter.z, DAMAGE_COLOR_NORMAL);
+    }
+    if (result.combat.attackerDied) {
+        Vector3 atkCenter = engine::hex::tileCenter(attackerRow, attackerCol);
+        effects.spawnDeathEffect(atkCenter.x, engine::DEATH_EFFECT_Y_OFFSET, atkCenter.z, DAMAGE_COLOR_COUNTER);
+    }
+
+    // ── Log combat event ─────────────────────────────────────────────────
+
+    game::CombatEvent event;
+    event.attackerUnitIndex = static_cast<std::size_t>(selectedUnit);
+    event.defenderUnitIndex = static_cast<std::size_t>(clickedUnit);
+    event.attackerFactionId = attackerFactionId;
+    event.defenderFactionId = defenderFactionId;
+    event.damageToDefender = result.combat.damageToDefender;
+    event.damageToAttacker = result.combat.damageToAttacker;
+    event.defenderDied = result.combat.defenderDied;
+    event.attackerDied = result.combat.attackerDied;
+    event.turn = state.getTurn();
+    event.tileRow = defenderRow;
+    event.tileCol = defenderCol;
+    event.attackerName = attackerName;
+    event.defenderName = defenderName;
+    event.attackerFactionName = attackerFactionName;
+    event.defenderFactionName = defenderFactionName;
+    combatLog.append(event);
+
+    // ── Update selection ─────────────────────────────────────────────────
 
     // If attacker died, deselect.
     if (result.combat.attackerDied) {
@@ -644,7 +703,7 @@ static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &ti
 /// Handle click when a unit is already selected.
 /// Returns true if the click was consumed.
 static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit,
-                                    int clickedUnit, CombatFlash &attackerFlash, CombatFlash &defenderFlash) {
+                                    int clickedUnit, engine::CombatEffectManager &effects, game::CombatLog &combatLog) {
     auto &units = state.units();
     auto &sel = units[selectedUnit];
 
@@ -660,7 +719,7 @@ static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::T
 
     // Click on another unit — try attack or switch selection.
     if (clickedUnit != NO_SELECTION && clickedUnit != selectedUnit) {
-        if (tryAttack(state, tile, selectedUnit, clickedUnit, attackerFlash, defenderFlash)) {
+        if (tryAttack(state, tile, selectedUnit, clickedUnit, effects, combatLog)) {
             return true;
         }
         // Click on a friendly unit — select it instead.
@@ -688,7 +747,7 @@ static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::T
 /// Handle a left-click on a tile for unit selection, movement, or attack.
 /// Returns true if the click was consumed by unit logic.
 static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit,
-                            CombatFlash &attackerFlash, CombatFlash &defenderFlash) {
+                            engine::CombatEffectManager &effects, game::CombatLog &combatLog) {
     int clickedUnit = findUnitAtTile(state, tile.row, tile.col);
 
     if (selectedUnit != NO_SELECTION) {
@@ -697,7 +756,7 @@ static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord
             selectedUnit = NO_SELECTION;
             return false;
         }
-        return handleSelectedUnitClick(state, tile, selectedUnit, clickedUnit, attackerFlash, defenderFlash);
+        return handleSelectedUnitClick(state, tile, selectedUnit, clickedUnit, effects, combatLog);
     }
 
     // No unit selected — try to select one.
@@ -712,13 +771,13 @@ static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord
 // ── Input handling ────────────────────────────────────────────────────────────
 
 static void handleInput(game::GameState &state, const std::optional<engine::hex::TileCoord> &hoveredTile,
-                        int &selectedUnit, std::optional<game::CityId> &selectedCity, CombatFlash &attackerFlash,
-                        CombatFlash &defenderFlash) {
+                        int &selectedUnit, std::optional<game::CityId> &selectedCity,
+                        engine::CombatEffectManager &effects, game::CombatLog &combatLog, int &combatLogScroll) {
     // Clean up any dead units and adjust selected unit index accordingly.
     state.removeDeadUnits(&selectedUnit);
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hoveredTile) {
-        bool unitHandled = handleUnitClick(state, *hoveredTile, selectedUnit, attackerFlash, defenderFlash);
+        bool unitHandled = handleUnitClick(state, *hoveredTile, selectedUnit, effects, combatLog);
         if (!unitHandled) {
             handleCityClick(state.cities(), *hoveredTile, selectedCity);
         }
@@ -736,24 +795,47 @@ static void handleInput(game::GameState &state, const std::optional<engine::hex:
     if (IsKeyPressed(KEY_SPACE)) {
         processTurn(state);
     }
+
+    // Combat log scrolling with Page Up / Page Down.
+    if (IsKeyPressed(KEY_PAGE_UP)) {
+        ++combatLogScroll;
+    }
+    if (IsKeyPressed(KEY_PAGE_DOWN) && combatLogScroll > 0) {
+        --combatLogScroll;
+    }
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
 static void renderFrame(const game::GameState &state, Camera3D cam,
                         const std::optional<engine::hex::TileCoord> &hoveredTile, int selectedUnit,
-                        std::optional<game::CityId> selectedCity, const CombatFlash &attackerFlash,
-                        const CombatFlash &defenderFlash) {
+                        std::optional<game::CityId> selectedCity, engine::CombatEffectManager &effects,
+                        const game::CombatLog &combatLog, int combatLogScroll) {
     engine::window::beginFrame();
 
     BeginMode3D(cam);
     engine::drawMap(state.map(), hoveredTile);
+
+    // Draw attack range overlay for selected ranged unit.
+    if (selectedUnit != NO_SELECTION) {
+        const auto &selUnit = state.units().at(selectedUnit);
+        if (selUnit->isAlive()) {
+            engine::drawAttackRangeOverlay(*selUnit, state.map());
+        }
+    }
+
     engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit, PLAYER_FACTION_ID, &state.diplomacy());
     engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy());
     engine::drawBuildings(state.buildings());
-    drawCombatFlash(attackerFlash);
-    drawCombatFlash(defenderFlash);
+
+    // Draw 3D combat effects (hit flashes and death effects).
+    effects.drawHitFlashes();
+    effects.drawDeathEffects();
+
     EndMode3D();
+
+    // Draw 2D overlay effects (floating damage numbers, projected from 3D).
+    effects.drawDamageNumbers(cam);
 
     drawTopHud(state, selectedUnit);
 
@@ -768,15 +850,10 @@ static void renderFrame(const game::GameState &state, Camera3D cam,
 
     drawFactionListPanel(state);
 
+    // Draw combat log panel.
+    engine::drawCombatLogPanel(combatLog, SCREEN_WIDTH, SCREEN_HEIGHT, combatLogScroll);
+
     engine::window::endFrame();
-}
-
-// ── Update combat flash timers ───────────────────────────────────────────────
-
-static void updateFlashTimer(CombatFlash &flash, float dt) {
-    if (flash.timer > 0.0F) {
-        flash.timer -= dt;
-    }
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -789,8 +866,11 @@ int main() {
 
     int selectedUnit = NO_SELECTION;
     std::optional<game::CityId> selectedCity;
-    CombatFlash attackerFlash;
-    CombatFlash defenderFlash;
+
+    // Combat feedback systems.
+    engine::CombatEffectManager combatEffects;
+    game::CombatLog combatLog;
+    int combatLogScroll = 0;
 
     setupDemoState(state);
 
@@ -800,13 +880,13 @@ int main() {
         auto hoveredTile = engine::input::mouseToTile(cam, MAP_ROWS, MAP_COLS);
         float dt = GetFrameTime();
 
-        updateFlashTimer(attackerFlash, dt);
-        updateFlashTimer(defenderFlash, dt);
+        // Update combat effects with delta time (frame-rate independent).
+        combatEffects.update(dt);
 
-        handleInput(state, hoveredTile, selectedUnit, selectedCity, attackerFlash, defenderFlash);
+        handleInput(state, hoveredTile, selectedUnit, selectedCity, combatEffects, combatLog, combatLogScroll);
         handleSaveLoad(state, selectedUnit);
 
-        renderFrame(state, cam, hoveredTile, selectedUnit, selectedCity, attackerFlash, defenderFlash);
+        renderFrame(state, cam, hoveredTile, selectedUnit, selectedCity, combatEffects, combatLog, combatLogScroll);
     }
 
     engine::window::shutdown();
