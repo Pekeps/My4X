@@ -161,7 +161,7 @@ TEST(SerializationTest, UnitRoundTrip) {
 
     auto warrior = std::make_unique<game::Warrior>(3, 4, reg, TEST_FACTION);
     warrior->takeDamage(30);
-    warrior->moveTo(4, 4);
+    warrior->moveTo(4, 4, 1);
     state.addUnit(std::move(warrior));
 
     auto fullHealthWarrior = std::make_unique<game::Warrior>(7, 7, reg, TEST_FACTION);

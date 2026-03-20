@@ -57,7 +57,7 @@ TEST(UnitTest, FactionIdSetAtConstruction) {
 TEST(UnitTest, MoveTo) {
     auto reg = makeTestRegistry();
     game::Warrior unit(0, 0, reg, TEST_FACTION);
-    unit.moveTo(1, 2);
+    unit.moveTo(1, 2, 1);
     EXPECT_EQ(unit.row(), 1);
     EXPECT_EQ(unit.col(), 2);
     EXPECT_EQ(unit.movementRemaining(), 1);
@@ -66,15 +66,15 @@ TEST(UnitTest, MoveTo) {
 TEST(UnitTest, MovementDepletesAfterMaxMoves) {
     auto reg = makeTestRegistry();
     game::Warrior unit(0, 0, reg, TEST_FACTION);
-    unit.moveTo(1, 0);
-    unit.moveTo(2, 0);
+    unit.moveTo(1, 0, 1);
+    unit.moveTo(2, 0, 1);
     EXPECT_EQ(unit.movementRemaining(), 0);
 }
 
 TEST(UnitTest, ResetMovement) {
     auto reg = makeTestRegistry();
     game::Warrior unit(0, 0, reg, TEST_FACTION);
-    unit.moveTo(1, 0);
+    unit.moveTo(1, 0, 1);
     EXPECT_EQ(unit.movementRemaining(), 1);
     unit.resetMovement();
     EXPECT_EQ(unit.movementRemaining(), 2);
