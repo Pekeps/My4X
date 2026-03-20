@@ -1,5 +1,6 @@
 #pragma once
 
+#include "game/Faction.h"
 #include "game/UnitTemplate.h"
 
 #include <string>
@@ -8,8 +9,9 @@ namespace game {
 
 class Unit {
   public:
-    /// Construct a unit at (row, col) whose stats come from the given template.
-    Unit(int row, int col, const UnitTemplate &tmpl);
+    /// Construct a unit at (row, col) whose stats come from the given template,
+    /// owned by the faction with the given ID.
+    Unit(int row, int col, const UnitTemplate &tmpl, FactionId factionId);
     virtual ~Unit() = default;
 
     Unit(const Unit &) = default;
@@ -38,6 +40,9 @@ class Unit {
 
     [[nodiscard]] const std::string &name() const;
 
+    /// Return the faction that owns this unit.
+    [[nodiscard]] FactionId factionId() const;
+
     /// Return the template that defines this unit's type.
     [[nodiscard]] const UnitTemplate &unitTemplate() const;
 
@@ -46,6 +51,7 @@ class Unit {
     int col_;
     int health_;
     int movementRemaining_;
+    FactionId factionId_;
     UnitTemplate template_;
 };
 

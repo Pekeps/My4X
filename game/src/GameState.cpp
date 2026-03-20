@@ -131,6 +131,16 @@ const std::vector<std::unique_ptr<Unit>> &GameState::units() const { return unit
 
 std::vector<std::unique_ptr<Unit>> &GameState::units() { return units_; }
 
+std::vector<const Unit *> GameState::unitsForFaction(FactionId factionId) const {
+    std::vector<const Unit *> result;
+    for (const auto &unit : units_) {
+        if (unit->factionId() == factionId) {
+            result.push_back(unit.get());
+        }
+    }
+    return result;
+}
+
 // -- FactionRegistry ---------------------------------------------------
 
 const FactionRegistry &GameState::factionRegistry() const { return factionRegistry_; }

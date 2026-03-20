@@ -1,3 +1,4 @@
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 #include "game/GameState.h"
 #include "game/Building.h"
 #include "game/City.h"
@@ -90,7 +91,7 @@ TEST(GameStateTest, AddUnitRegistersInTileRegistry) {
     game::GameState state(4, 4);
     game::UnitTypeRegistry reg;
     reg.registerDefaults();
-    auto warrior = std::make_unique<game::Warrior>(1, 1, reg);
+    auto warrior = std::make_unique<game::Warrior>(1, 1, reg, 1);
     game::Unit *raw = warrior.get();
 
     std::size_t idx = state.addUnit(std::move(warrior));
@@ -106,7 +107,7 @@ TEST(GameStateTest, RemoveUnitUnregistersFromTileRegistry) {
     game::GameState state(4, 4);
     game::UnitTypeRegistry reg;
     reg.registerDefaults();
-    auto warrior = std::make_unique<game::Warrior>(1, 1, reg);
+    auto warrior = std::make_unique<game::Warrior>(1, 1, reg, 1);
     state.addUnit(std::move(warrior));
 
     state.removeUnit(0);
@@ -117,6 +118,39 @@ TEST(GameStateTest, RemoveUnitUnregistersFromTileRegistry) {
 TEST(GameStateTest, RemoveUnitOutOfRangeThrows) {
     game::GameState state(4, 4);
     EXPECT_THROW(state.removeUnit(0), std::out_of_range);
+}
+
+TEST(GameStateTest, UnitsForFactionReturnsMatchingUnits) {
+    game::GameState state(4, 4);
+    game::UnitTypeRegistry reg;
+    reg.registerDefaults();
+
+    constexpr game::FactionId factionA = 1;
+    constexpr game::FactionId factionB = 2;
+
+    state.addUnit(std::make_unique<game::Warrior>(0, 0, reg, factionA));
+    state.addUnit(std::make_unique<game::Warrior>(1, 1, reg, factionB));
+    state.addUnit(std::make_unique<game::Warrior>(2, 2, reg, factionA));
+
+    auto unitsA = state.unitsForFaction(factionA);
+    EXPECT_EQ(unitsA.size(), 2);
+    EXPECT_EQ(unitsA[0]->row(), 0);
+    EXPECT_EQ(unitsA[1]->row(), 2);
+
+    auto unitsB = state.unitsForFaction(factionB);
+    EXPECT_EQ(unitsB.size(), 1);
+    EXPECT_EQ(unitsB[0]->row(), 1);
+}
+
+TEST(GameStateTest, UnitsForFactionReturnsEmptyWhenNoMatch) {
+    game::GameState state(4, 4);
+    game::UnitTypeRegistry reg;
+    reg.registerDefaults();
+
+    state.addUnit(std::make_unique<game::Warrior>(0, 0, reg, 1));
+
+    auto units = state.unitsForFaction(99);
+    EXPECT_TRUE(units.empty());
 }
 
 // -- Faction resource tests -------------------------------------------
@@ -133,3 +167,4 @@ TEST(GameStateTest, FactionResourcesMutable) {
     EXPECT_EQ(state.factionResources().production, 50);
     EXPECT_EQ(state.factionResources().food, 25);
 }
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
