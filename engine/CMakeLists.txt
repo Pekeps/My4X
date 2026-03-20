@@ -13,6 +13,10 @@ add_library(my4x_engine STATIC
     src/Minimap.cpp
     src/AnimationController.cpp
     src/ParticleSystem.cpp
+    src/Transition.cpp
+    src/Tooltip.cpp
+    src/MenuSystem.cpp
+    src/EndTurnButton.cpp
     src/ModelManager.cpp
 )
 
