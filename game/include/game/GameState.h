@@ -2,8 +2,8 @@
 
 #include "game/Building.h"
 #include "game/City.h"
-#include "game/Faction.h"
 #include "game/DiplomacyManager.h"
+#include "game/Faction.h"
 #include "game/FactionRegistry.h"
 #include "game/Map.h"
 #include "game/Resource.h"

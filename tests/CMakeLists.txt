@@ -14,6 +14,7 @@ add_executable(my4x_tests
     game/test_faction_registry.cpp
     game/test_diplomacy_manager.cpp
     game/test_unit_template.cpp
+    game/test_neutral_ai.cpp
     engine/test_hex_grid.cpp
 )
 
