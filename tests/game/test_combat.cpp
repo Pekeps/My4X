@@ -247,4 +247,93 @@ TEST(CombatTest, DamageClampedToRemainingHealth) {
     EXPECT_TRUE(result.defenderDied);
 }
 
+// ── Archer vs Archer (neither counter-attacks) ──────────────────────────────
+
+TEST(CombatTest, ArcherVsArcher_NoCounterAttack) {
+    auto reg = makeRegistry();
+    // Archer: attack=12, defense=5, hp=70, range=3
+    game::Unit attacker(0, 0, reg.getTemplate("Archer"), FACTION_A);
+    game::Unit defender(3, 0, reg.getTemplate("Archer"), FACTION_B);
+
+    game::CombatContext context;
+    context.rangedAttack = true;
+
+    auto result = game::resolveCombat(attacker, defender, context);
+
+    // damage = max(1, 12 - 5/2) = max(1, 10) = 10
+    EXPECT_EQ(result.damageToDefender, 10);
+    EXPECT_FALSE(result.defenderDied);
+
+    // Ranged attack + ranged defender = no counter-attack regardless.
+    EXPECT_EQ(result.damageToAttacker, 0);
+    EXPECT_FALSE(result.attackerDied);
+}
+
+// ── Ranged attack kills defender — verify no phantom damage ─────────────────
+
+TEST(CombatTest, RangedAttack_DefenderDies_NoDamageToAttacker) {
+    auto reg = makeRegistry();
+    registerCustom(reg, "HeavyArcher", 100, 60, 5, 3);
+    registerCustom(reg, "FragileUnit", 5, 50, 0, 1);
+
+    game::Unit attacker(0, 0, reg.getTemplate("HeavyArcher"), FACTION_A);
+    game::Unit defender(3, 0, reg.getTemplate("FragileUnit"), FACTION_B);
+
+    game::CombatContext context;
+    context.rangedAttack = true;
+
+    auto result = game::resolveCombat(attacker, defender, context);
+
+    // damage = max(1, 60 - 0/2) = 60, clamped to defender HP = 5
+    EXPECT_EQ(result.damageToDefender, 5);
+    EXPECT_TRUE(result.defenderDied);
+    EXPECT_EQ(result.damageToAttacker, 0);
+    EXPECT_FALSE(result.attackerDied);
+}
+
+// ── Ranged attack with terrain defense bonus ────────────────────────────────
+
+TEST(CombatTest, RangedAttack_TerrainDefenseBonus) {
+    auto reg = makeRegistry();
+    // Archer: attack=12, Warrior: defense=10
+    game::Unit attacker(0, 0, reg.getTemplate("Archer"), FACTION_A);
+    game::Unit defender(3, 0, reg.getTemplate("Warrior"), FACTION_B);
+
+    game::CombatContext context;
+    context.rangedAttack = true;
+    context.terrainDefenseBonus = 4; // defender on defensive terrain
+
+    auto result = game::resolveCombat(attacker, defender, context);
+
+    // effectiveDefense = 10 + 4 = 14
+    // damage = max(1, 12 - 14/2) = max(1, 5) = 5
+    EXPECT_EQ(result.damageToDefender, 5);
+    EXPECT_EQ(result.damageToAttacker, 0);
+}
+
+// ── Ranged melee defender counter-attack suppressed ─────────────────────────
+
+TEST(CombatTest, RangedAttack_MeleeDefenderSurvives_NoCounter) {
+    auto reg = makeRegistry();
+    // Even if defender is a strong melee unit that survives, ranged attack
+    // suppresses counter-attack.
+    registerCustom(reg, "Titan", 500, 80, 20, 1);
+
+    game::Unit attacker(0, 0, reg.getTemplate("Archer"), FACTION_A);
+    game::Unit defender(3, 0, reg.getTemplate("Titan"), FACTION_B);
+
+    game::CombatContext context;
+    context.rangedAttack = true;
+
+    auto result = game::resolveCombat(attacker, defender, context);
+
+    // damage = max(1, 12 - 20/2) = max(1, 2) = 2
+    EXPECT_EQ(result.damageToDefender, 2);
+    EXPECT_FALSE(result.defenderDied);
+
+    // Titan is melee and survived, but rangedAttack flag suppresses counter.
+    EXPECT_EQ(result.damageToAttacker, 0);
+    EXPECT_FALSE(result.attackerDied);
+}
+
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

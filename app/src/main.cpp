@@ -20,6 +20,7 @@
 #include "game/NeutralAI.h"
 #include "game/SaveLoad.h"
 #include "game/TerrainType.h"
+#include "game/Unit.h"
 #include "game/UnitTypeRegistry.h"
 #include "game/Warrior.h"
 
@@ -114,10 +115,11 @@ static void setupDemoState(game::GameState &state) {
     // Also populate the legacy factionResources for backward compat.
     state.factionResources() += game::Resource{.gold = 50, .production = 20, .food = 30};
 
-    // Add a player warrior unit.
+    // Add player units: a warrior and an archer.
     game::UnitTypeRegistry unitReg;
     unitReg.registerDefaults();
     state.addUnit(std::make_unique<game::Warrior>(5, 5, unitReg, playerId));
+    state.addUnit(std::make_unique<game::Unit>(5, 6, unitReg.getTemplate("Archer"), playerId));
 
     // Spawn neutral factions (hostile + passive) with units and diplomacy.
     game::NeutralAI::spawnNeutralFactions(state);
