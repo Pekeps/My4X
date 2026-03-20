@@ -33,6 +33,7 @@ add_executable(my4x_tests
     game/test_map_generator.cpp
     game/test_pathfinding.cpp
     game/test_movement_range.cpp
+    game/test_zone_of_control.cpp
 )
 
 target_link_libraries(my4x_tests PRIVATE my4x_game my4x_engine GTest::gtest_main)

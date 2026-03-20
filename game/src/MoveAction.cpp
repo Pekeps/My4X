@@ -4,6 +4,7 @@
 #include "game/GameState.h"
 #include "game/TerrainType.h"
 #include "game/Unit.h"
+#include "game/ZoneOfControl.h"
 
 namespace game {
 
@@ -46,6 +47,13 @@ MoveValidation MoveAction::validate(const GameState &state) const {
 
     if (unit.movementRemaining() < terrainProps.movementCost) {
         return MoveValidation::InsufficientMovement;
+    }
+
+    // Zone-of-control check: moving directly from one enemy ZoC hex to
+    // another ZoC hex of the same enemy is forbidden.
+    if (zoc::isMovementBlockedByZoc(unit.row(), unit.col(), destRow_, destCol_, unit.factionId(), state.map(),
+                                    state.registry(), state.diplomacy())) {
+        return MoveValidation::BlockedByZoneOfControl;
     }
 
     return MoveValidation::Valid;

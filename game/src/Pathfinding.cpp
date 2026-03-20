@@ -2,6 +2,7 @@
 
 #include "game/TerrainType.h"
 #include "game/Unit.h"
+#include "game/ZoneOfControl.h"
 
 #include <algorithm>
 #include <array>
@@ -77,6 +78,39 @@ bool isTileBlocked(int row, int col, const Map &map, const TileRegistry &registr
     return std::ranges::any_of(units, [factionId](const auto *unit) { return unit->factionId() != factionId; });
 }
 
+/// Reconstruct a path from goal to start using the cameFrom map.
+std::vector<TileCoord> reconstructPath(const TileCoord &goal, const TileCoord &start,
+                                       const std::unordered_map<TileCoord, TileCoord, TileCoordHash> &cameFrom) {
+    std::vector<TileCoord> path;
+    TileCoord step = goal;
+    while (!(step == start)) {
+        path.push_back(step);
+        step = cameFrom.at(step);
+    }
+    std::ranges::reverse(path);
+    return path;
+}
+
+/// Try to update the g-score for a neighbor and push it to the open set.
+void tryExpandNeighbor(const TileCoord &neighbor, const TileCoord &current, int currentG, int goalRow, int goalCol,
+                       const Map &map, std::unordered_map<TileCoord, int, TileCoordHash> &gScore,
+                       std::unordered_map<TileCoord, TileCoord, TileCoordHash> &cameFrom,
+                       std::priority_queue<OpenNode, std::vector<OpenNode>, std::greater<>> &openSet) {
+    const auto &tile = map.tile(neighbor.row, neighbor.col);
+    const auto &props = getTerrainProperties(tile.terrainType());
+    int tentativeG = currentG + props.movementCost;
+
+    auto neighborIt = gScore.find(neighbor);
+    int bestG = (neighborIt != gScore.end()) ? neighborIt->second : INFINITE_COST;
+
+    if (tentativeG < bestG) {
+        gScore[neighbor] = tentativeG;
+        cameFrom[neighbor] = current;
+        int heuristic = hexDistance(neighbor.row, neighbor.col, goalRow, goalCol);
+        openSet.push({neighbor, tentativeG + heuristic});
+    }
+}
+
 } // namespace
 
 int hexDistance(int row1, int col1, int row2, int col2) {
@@ -150,15 +184,7 @@ std::vector<TileCoord> findPath(int startRow, int startCol, int goalRow, int goa
 
         // Reached the goal — reconstruct the path.
         if (current.coord == goal) {
-            std::vector<TileCoord> path;
-            TileCoord step = goal;
-            while (!(step == start)) {
-                path.push_back(step);
-                step = cameFrom.at(step);
-            }
-            // Path was built from goal to start; reverse it.
-            std::ranges::reverse(path);
-            return path;
+            return reconstructPath(goal, start, cameFrom);
         }
 
         int currentG = gScore[current.coord];
@@ -175,23 +201,79 @@ std::vector<TileCoord> findPath(int startRow, int startCol, int goalRow, int goa
         for (const auto &neighbor : neighbors) {
             // Skip blocked tiles.
             if (isTileBlocked(neighbor.row, neighbor.col, map, registry, factionId)) {
-                // Exception: the goal tile was already checked above and is passable.
                 continue;
             }
 
-            const auto &tile = map.tile(neighbor.row, neighbor.col);
-            const auto &props = getTerrainProperties(tile.terrainType());
-            int tentativeG = currentG + props.movementCost;
+            tryExpandNeighbor(neighbor, current.coord, currentG, goalRow, goalCol, map, gScore, cameFrom, openSet);
+        }
+    }
 
-            auto neighborIt = gScore.find(neighbor);
-            int bestG = (neighborIt != gScore.end()) ? neighborIt->second : INFINITE_COST;
+    // No path found.
+    return {};
+}
 
-            if (tentativeG < bestG) {
-                gScore[neighbor] = tentativeG;
-                cameFrom[neighbor] = current.coord;
-                int heuristic = hexDistance(neighbor.row, neighbor.col, goalRow, goalCol);
-                openSet.push({neighbor, tentativeG + heuristic});
+std::vector<TileCoord> findPathWithZoc(int startRow, int startCol, int goalRow, int goalCol, const Map &map,
+                                       const TileRegistry &registry, FactionId factionId,
+                                       const DiplomacyManager &diplomacy) {
+    // Trivial case: start == goal.
+    if (startRow == goalRow && startCol == goalCol) {
+        return {};
+    }
+
+    // Quick check: if the goal tile itself is blocked, no path exists.
+    if (isTileBlocked(goalRow, goalCol, map, registry, factionId)) {
+        return {};
+    }
+
+    int mapHeight = map.height();
+    int mapWidth = map.width();
+
+    std::priority_queue<OpenNode, std::vector<OpenNode>, std::greater<>> openSet;
+    std::unordered_map<TileCoord, int, TileCoordHash> gScore;
+    std::unordered_map<TileCoord, TileCoord, TileCoordHash> cameFrom;
+
+    TileCoord start = {.row = startRow, .col = startCol};
+    TileCoord goal = {.row = goalRow, .col = goalCol};
+
+    gScore[start] = 0;
+    openSet.push({start, hexDistance(startRow, startCol, goalRow, goalCol)});
+
+    while (!openSet.empty()) {
+        auto current = openSet.top();
+        openSet.pop();
+
+        if (current.coord == goal) {
+            return reconstructPath(goal, start, cameFrom);
+        }
+
+        int currentG = gScore[current.coord];
+
+        // Skip stale entries.
+        auto it = gScore.find(current.coord);
+        if (it != gScore.end() && currentG < it->second) {
+            continue;
+        }
+
+        // ZoC rule: if the current tile is in enemy ZoC (and is not the
+        // start), the unit must stop here — do not expand further.
+        bool isZocStop = !(current.coord == start) &&
+                         zoc::isInEnemyZoc(current.coord.row, current.coord.col, factionId, map, registry, diplomacy);
+        if (isZocStop) {
+            continue;
+        }
+
+        for (const auto &neighbor : hexNeighbors(current.coord.row, current.coord.col, mapHeight, mapWidth)) {
+            if (isTileBlocked(neighbor.row, neighbor.col, map, registry, factionId)) {
+                continue;
             }
+
+            // ZoC rule: moving from one enemy ZoC hex to another of the same enemy is forbidden.
+            if (zoc::isMovementBlockedByZoc(current.coord.row, current.coord.col, neighbor.row, neighbor.col, factionId,
+                                            map, registry, diplomacy)) {
+                continue;
+            }
+
+            tryExpandNeighbor(neighbor, current.coord, currentG, goalRow, goalCol, map, gScore, cameFrom, openSet);
         }
     }
 
