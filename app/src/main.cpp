@@ -10,6 +10,7 @@
 #include "engine/HexGrid.h"
 #include "engine/Input.h"
 #include "engine/MapRenderer.h"
+#include "engine/Minimap.h"
 #include "engine/RangeOverlay.h"
 #include "engine/UnitRenderer.h"
 #include "engine/Window.h"
@@ -917,6 +918,10 @@ static void renderFrame(const game::GameState &state, Camera3D cam,
 
     // Draw combat log panel.
     engine::drawCombatLogPanel(combatLog, SCREEN_WIDTH, SCREEN_HEIGHT, combatLogScroll);
+
+    // Draw minimap overlay.
+    engine::minimap::draw(state.map(), &state.fogOfWar(), PLAYER_FACTION_ID, state.units(), state.cities(),
+                          state.factionRegistry(), cam, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     engine::window::endFrame();
 }

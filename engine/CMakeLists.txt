@@ -10,6 +10,7 @@ add_library(my4x_engine STATIC
     src/CombatEffects.cpp
     src/CombatLogRenderer.cpp
     src/RangeOverlay.cpp
+    src/Minimap.cpp
 )
 
 target_include_directories(my4x_engine PUBLIC include)
