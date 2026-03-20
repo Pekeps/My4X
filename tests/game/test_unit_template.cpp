@@ -1,4 +1,5 @@
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+#include "game/Faction.h"
 #include "game/Unit.h"
 #include "game/UnitTemplate.h"
 #include "game/UnitTypeRegistry.h"
@@ -13,6 +14,8 @@ game::UnitTypeRegistry makeDefaultRegistry() {
     reg.registerDefaults();
     return reg;
 }
+
+constexpr game::FactionId TEST_FACTION = 1;
 
 } // namespace
 
@@ -105,7 +108,7 @@ TEST(UnitTypeRegistryTest, SettlerTemplateStats) {
 TEST(UnitTemplateTest, CreateUnitFromWarriorTemplate) {
     auto reg = makeDefaultRegistry();
     const auto &tmpl = reg.getTemplate("Warrior");
-    game::Unit unit(2, 3, tmpl);
+    game::Unit unit(2, 3, tmpl, TEST_FACTION);
 
     EXPECT_EQ(unit.name(), "Warrior");
     EXPECT_EQ(unit.health(), 100);
@@ -121,7 +124,7 @@ TEST(UnitTemplateTest, CreateUnitFromWarriorTemplate) {
 TEST(UnitTemplateTest, CreateUnitFromArcherTemplate) {
     auto reg = makeDefaultRegistry();
     const auto &tmpl = reg.getTemplate("Archer");
-    game::Unit unit(0, 0, tmpl);
+    game::Unit unit(0, 0, tmpl, TEST_FACTION);
 
     EXPECT_EQ(unit.name(), "Archer");
     EXPECT_EQ(unit.health(), 70);
@@ -135,7 +138,7 @@ TEST(UnitTemplateTest, CreateUnitFromArcherTemplate) {
 TEST(UnitTemplateTest, CreateUnitFromSettlerTemplate) {
     auto reg = makeDefaultRegistry();
     const auto &tmpl = reg.getTemplate("Settler");
-    game::Unit unit(5, 5, tmpl);
+    game::Unit unit(5, 5, tmpl, TEST_FACTION);
 
     EXPECT_EQ(unit.name(), "Settler");
     EXPECT_EQ(unit.health(), 50);
@@ -149,7 +152,7 @@ TEST(UnitTemplateTest, CreateUnitFromSettlerTemplate) {
 TEST(UnitTemplateTest, UnitReferencesTemplate) {
     auto reg = makeDefaultRegistry();
     const auto &tmpl = reg.getTemplate("Archer");
-    game::Unit unit(0, 0, tmpl);
+    game::Unit unit(0, 0, tmpl, TEST_FACTION);
 
     EXPECT_EQ(unit.unitTemplate().name, tmpl.name);
     EXPECT_EQ(unit.unitTemplate().maxHealth, tmpl.maxHealth);

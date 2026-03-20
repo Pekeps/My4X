@@ -185,7 +185,7 @@ std::string serializeGameState(const GameState &state) {
         protoUnit->set_col(unit->col());
         protoUnit->set_health(unit->health());
         protoUnit->set_movement_remaining(unit->movementRemaining());
-        protoUnit->set_faction_id(unit->factionId());
+        protoUnit->set_faction_id(static_cast<int32_t>(unit->factionId()));
     }
 
     // Faction resources

@@ -12,6 +12,8 @@ game::UnitTypeRegistry makeTestRegistry() {
     return reg;
 }
 
+constexpr game::FactionId TEST_FACTION = 1;
+
 } // namespace
 
 // --- City registration ---
@@ -78,7 +80,7 @@ TEST(TileRegistryTest, UnitsAtReturnsEmptyWhenNone) {
 TEST(TileRegistryTest, RegisterAndQueryUnit) {
     game::TileRegistry registry;
     auto unitReg = makeTestRegistry();
-    game::Warrior warrior(1, 2, unitReg);
+    game::Warrior warrior(1, 2, unitReg, TEST_FACTION);
     registry.registerUnit(1, 2, &warrior);
     auto units = registry.unitsAt(1, 2);
     ASSERT_EQ(units.size(), 1);
@@ -88,8 +90,8 @@ TEST(TileRegistryTest, RegisterAndQueryUnit) {
 TEST(TileRegistryTest, MultipleUnitsOnSameTile) {
     game::TileRegistry registry;
     auto unitReg = makeTestRegistry();
-    game::Warrior warrior1(3, 3, unitReg);
-    game::Warrior warrior2(3, 3, unitReg);
+    game::Warrior warrior1(3, 3, unitReg, TEST_FACTION);
+    game::Warrior warrior2(3, 3, unitReg, TEST_FACTION);
     registry.registerUnit(3, 3, &warrior1);
     registry.registerUnit(3, 3, &warrior2);
     auto units = registry.unitsAt(3, 3);
@@ -101,7 +103,7 @@ TEST(TileRegistryTest, MultipleUnitsOnSameTile) {
 TEST(TileRegistryTest, UnregisterUnitRemovesIt) {
     game::TileRegistry registry;
     auto unitReg = makeTestRegistry();
-    game::Warrior warrior(1, 2, unitReg);
+    game::Warrior warrior(1, 2, unitReg, TEST_FACTION);
     registry.registerUnit(1, 2, &warrior);
     registry.unregisterUnit(1, 2, &warrior);
     auto units = registry.unitsAt(1, 2);
@@ -111,8 +113,8 @@ TEST(TileRegistryTest, UnregisterUnitRemovesIt) {
 TEST(TileRegistryTest, UnregisterOneUnitLeavesOthers) {
     game::TileRegistry registry;
     auto unitReg = makeTestRegistry();
-    game::Warrior warrior1(3, 3, unitReg);
-    game::Warrior warrior2(3, 3, unitReg);
+    game::Warrior warrior1(3, 3, unitReg, TEST_FACTION);
+    game::Warrior warrior2(3, 3, unitReg, TEST_FACTION);
     registry.registerUnit(3, 3, &warrior1);
     registry.registerUnit(3, 3, &warrior2);
     registry.unregisterUnit(3, 3, &warrior1);
@@ -124,7 +126,7 @@ TEST(TileRegistryTest, UnregisterOneUnitLeavesOthers) {
 TEST(TileRegistryTest, UnregisterUnitFromEmptyTileIsNoOp) {
     game::TileRegistry registry;
     auto unitReg = makeTestRegistry();
-    game::Warrior warrior(0, 0, unitReg);
+    game::Warrior warrior(0, 0, unitReg, TEST_FACTION);
     // Should not crash or throw.
     registry.unregisterUnit(0, 0, &warrior);
     EXPECT_TRUE(registry.unitsAt(0, 0).empty());
@@ -152,7 +154,7 @@ TEST(TileRegistryTest, IsOccupiedTrueWithBuilding) {
 TEST(TileRegistryTest, IsOccupiedTrueWithUnit) {
     game::TileRegistry registry;
     auto unitReg = makeTestRegistry();
-    game::Warrior warrior(4, 4, unitReg);
+    game::Warrior warrior(4, 4, unitReg, TEST_FACTION);
     registry.registerUnit(4, 4, &warrior);
     EXPECT_TRUE(registry.isOccupied(4, 4));
 }
@@ -160,7 +162,7 @@ TEST(TileRegistryTest, IsOccupiedTrueWithUnit) {
 TEST(TileRegistryTest, IsOccupiedFalseAfterAllUnregistered) {
     game::TileRegistry registry;
     auto unitReg = makeTestRegistry();
-    game::Warrior warrior(1, 1, unitReg);
+    game::Warrior warrior(1, 1, unitReg, TEST_FACTION);
     registry.registerCity(1, 1, 10);
     registry.registerBuilding(1, 1, 20);
     registry.registerUnit(1, 1, &warrior);
