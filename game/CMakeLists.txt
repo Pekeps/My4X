@@ -18,6 +18,7 @@ add_library(my4x_game STATIC
     src/DiplomacyManager.cpp
     src/NeutralAI.cpp
     src/Combat.cpp
+    src/CombatLog.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
