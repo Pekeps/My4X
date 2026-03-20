@@ -28,8 +28,11 @@ void Unit::takeDamage(int amount) {
     health_ = std::max(0, health_ - amount);
 }
 
-int Unit::attack() const { return template_.attack; }
-int Unit::defense() const { return template_.defense; }
+int Unit::baseAttack() const { return template_.attack; }
+int Unit::baseDefense() const { return template_.defense; }
+
+int Unit::attack() const { return template_.attack + (level_ * STAT_BONUS_PER_LEVEL); }
+int Unit::defense() const { return template_.defense + (level_ * STAT_BONUS_PER_LEVEL); }
 int Unit::attackRange() const { return template_.attackRange; }
 
 int Unit::movement() const { return template_.movementRange; }
@@ -45,5 +48,46 @@ const std::string &Unit::name() const { return template_.name; }
 FactionId Unit::factionId() const { return factionId_; }
 
 const UnitTemplate &Unit::unitTemplate() const { return template_; }
+
+// ── Experience / leveling ────────────────────────────────────────────────────
+
+int Unit::experience() const { return experience_; }
+
+int Unit::level() const { return level_; }
+
+bool Unit::addExperience(int xp) {
+    if (xp <= 0) {
+        return false;
+    }
+    int previousLevel = level_;
+    experience_ += xp;
+    recomputeLevel();
+    if (level_ > previousLevel) {
+        justLeveledUp_ = true;
+        return true;
+    }
+    return false;
+}
+
+void Unit::setExperience(int xp) {
+    experience_ = std::max(0, xp);
+    recomputeLevel();
+}
+
+bool Unit::justLeveledUp() const { return justLeveledUp_; }
+
+void Unit::clearLevelUpFlag() { justLeveledUp_ = false; }
+
+void Unit::recomputeLevel() {
+    int newLevel = 0;
+    for (int i = 0; i < XP_THRESHOLD_COUNT; ++i) {
+        if (experience_ >= XP_THRESHOLDS.at(i)) {
+            newLevel = i + 1;
+        } else {
+            break;
+        }
+    }
+    level_ = std::min(newLevel, MAX_UNIT_LEVEL);
+}
 
 } // namespace game

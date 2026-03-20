@@ -23,6 +23,7 @@ add_executable(my4x_tests
     game/test_combat.cpp
     game/test_combat_log.cpp
     game/test_attack_action.cpp
+    game/test_unit_experience.cpp
 )
 
 target_link_libraries(my4x_tests PRIVATE my4x_game my4x_engine GTest::gtest_main)

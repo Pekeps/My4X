@@ -192,6 +192,7 @@ std::string serializeGameState(const GameState &state) {
         protoUnit->set_health(unit->health());
         protoUnit->set_movement_remaining(unit->movementRemaining());
         protoUnit->set_faction_id(static_cast<int32_t>(unit->factionId()));
+        protoUnit->set_experience(unit->experience());
     }
 
     // Faction resources
@@ -294,6 +295,7 @@ GameState deserializeGameState(const std::string &data) {
         auto unit = std::make_unique<Unit>(protoUnit.row(), protoUnit.col(), tmpl, protoUnit.faction_id());
         unit->setHealth(protoUnit.health());
         unit->setMovementRemaining(protoUnit.movement_remaining());
+        unit->setExperience(protoUnit.experience());
         state.addUnit(std::move(unit));
     }
 

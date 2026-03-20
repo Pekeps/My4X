@@ -14,4 +14,5 @@ message Unit {
   int32 health = 5;
   int32 movement_remaining = 6;
   int32 faction_id = 7;
+  int32 experience = 8;
 }

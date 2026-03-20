@@ -213,6 +213,10 @@ static void drawTopHud(const game::GameState &state, int selectedUnit) {
         std::string info = unit->name() + "  HP " + std::to_string(unit->health()) + "/" +
                            std::to_string(unit->maxHealth()) + "  Moves " + std::to_string(unit->movementRemaining()) +
                            "/" + std::to_string(unit->movement());
+        if (unit->level() > 0) {
+            info += "  Lv " + std::to_string(unit->level());
+        }
+        info += "  XP " + std::to_string(unit->experience());
         DrawText(info.c_str(), HUD_X, y, HUD_TEXT_SIZE, YELLOW);
         y += HUD_LINE_H;
 
@@ -492,9 +496,10 @@ static void handleBuildActions(game::GameState &state, game::CityId cityId,
 static void processTurn(game::GameState &state) {
     state.nextTurn();
 
-    // Reset unit movement
+    // Reset unit movement and clear level-up indicators from previous turn.
     for (auto &unit : state.units()) {
         unit->resetMovement();
+        unit->clearLevelUpFlag();
     }
 
     // Apply city production to build queues
