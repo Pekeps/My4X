@@ -19,6 +19,14 @@ const Faction &FactionRegistry::getFaction(FactionId id) const {
     return *iter;
 }
 
+const Faction *FactionRegistry::findFaction(FactionId id) const {
+    auto iter = std::ranges::find_if(factions_, [id](const Faction &f) { return f.id() == id; });
+    if (iter == factions_.end()) {
+        return nullptr;
+    }
+    return &(*iter);
+}
+
 Faction &FactionRegistry::getMutableFaction(FactionId id) {
     auto iter = std::ranges::find_if(factions_, [id](Faction &f) { return f.id() == id; });
     if (iter == factions_.end()) {

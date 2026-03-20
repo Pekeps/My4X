@@ -420,8 +420,8 @@ int main() {
 
         BeginMode3D(cam);
         engine::drawMap(state.map(), hoveredTile);
-        engine::drawUnits(state.units(), selectedUnit);
-        engine::drawCities(state.cities(), selectedCity);
+        engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit);
+        engine::drawCities(state.cities(), state.factionRegistry(), selectedCity);
         engine::drawBuildings(state.buildings());
         EndMode3D();
 
