@@ -192,6 +192,7 @@ TEST(CombatTest, DefaultContext_NoModifiers) {
     game::CombatContext ctx;
     EXPECT_EQ(ctx.terrainDefenseBonus, 0);
     EXPECT_EQ(ctx.attackerTerrainDefenseBonus, 0);
+    EXPECT_FALSE(ctx.rangedAttack);
 }
 
 // ── Zero attack still deals minimum damage ──────────────────────────────────
@@ -206,6 +207,27 @@ TEST(CombatTest, ZeroAttack_StillDealsMinimumDamage) {
 
     // damage = max(1, 0 - 10/2) = max(1, -5) = 1
     EXPECT_EQ(result.damageToDefender, 1);
+}
+
+// ── Ranged attack suppresses melee counter-attack ───────────────────────────
+
+TEST(CombatTest, RangedAttackFlag_SuppressesCounterAttack) {
+    auto reg = makeRegistry();
+    // Warrior (melee) attacking from range (via context flag).
+    game::Unit attacker(0, 0, reg.getTemplate("Warrior"), FACTION_A);
+    game::Unit defender(3, 0, reg.getTemplate("Warrior"), FACTION_B);
+
+    game::CombatContext context;
+    context.rangedAttack = true;
+
+    auto result = game::resolveCombat(attacker, defender, context);
+
+    // Damage to defender should still be dealt.
+    EXPECT_GT(result.damageToDefender, 0);
+
+    // Counter-attack suppressed because rangedAttack = true.
+    EXPECT_EQ(result.damageToAttacker, 0);
+    EXPECT_FALSE(result.attackerDied);
 }
 
 // ── Damage clamped to defender's remaining health ───────────────────────────

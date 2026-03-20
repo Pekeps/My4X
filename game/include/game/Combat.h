@@ -26,6 +26,10 @@ struct CombatContext {
     /// Additive defense bonus applied to the attacker from terrain when
     /// receiving a counter-attack.
     int attackerTerrainDefenseBonus = 0;
+
+    /// If true, the attack is from outside melee range (ranged attack).
+    /// Suppresses defender counter-attack even if the defender is melee.
+    bool rangedAttack = false;
 };
 
 // ── Combat formula constants ────────────────────────────────────────────────

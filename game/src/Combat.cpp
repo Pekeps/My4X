@@ -35,7 +35,7 @@ CombatResult resolveCombat(const Unit &attacker, const Unit &defender, const Com
     static constexpr int MELEE_RANGE = 1;
     const bool defenderIsMelee = (defender.attackRange() == MELEE_RANGE);
 
-    if (defenderIsMelee && !result.defenderDied) {
+    if (defenderIsMelee && !result.defenderDied && !context.rangedAttack) {
         result.damageToAttacker =
             computeDamage(defender.attack(), attacker.defense(), context.attackerTerrainDefenseBonus);
 
