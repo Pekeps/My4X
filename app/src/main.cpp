@@ -187,7 +187,7 @@ static void drawTopHud(const game::GameState &state, int selectedUnit) {
     // Background — compute height dynamically.
     int hudH = 78;
     if (selectedUnit != NO_SELECTION) {
-        hudH += HUD_LINE_H * 2; // unit info + faction/diplomacy line
+        hudH += HUD_LINE_H * 3; // unit info + faction/diplomacy line + terrain defense line
     }
     if (playerFaction != nullptr) {
         hudH += HUD_LINE_H; // faction name line
@@ -255,6 +255,24 @@ static void drawTopHud(const game::GameState &state, int selectedUnit) {
                 DrawText(dipStr.c_str(), HUD_X + nameW, y, HUD_TEXT_SIZE, dipColor);
             }
         }
+        y += HUD_LINE_H;
+
+        // Show terrain defense bonus for the unit's current tile.
+        auto terrain = state.map().tile(unit->row(), unit->col()).terrainType();
+        const auto &terrainProps = game::getTerrainProperties(terrain);
+        std::string terrainStr = "Terrain: " + std::string(game::terrainName(terrain));
+        if (terrainProps.defenseModifier > 0) {
+            terrainStr += "  Defense +" + std::to_string(terrainProps.defenseModifier);
+        } else if (terrainProps.defenseModifier < 0) {
+            terrainStr += "  Defense " + std::to_string(terrainProps.defenseModifier);
+        }
+        Color terrainColor = HUD_DIM_COL;
+        if (terrainProps.defenseModifier > 0) {
+            terrainColor = Color{100, 200, 255, 255};
+        } else if (terrainProps.defenseModifier < 0) {
+            terrainColor = Color{255, 140, 100, 255};
+        }
+        DrawText(terrainStr.c_str(), HUD_X, y, HUD_TEXT_SIZE, terrainColor);
     }
 }
 
