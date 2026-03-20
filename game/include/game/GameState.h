@@ -2,6 +2,7 @@
 
 #include "game/Building.h"
 #include "game/City.h"
+#include "game/FactionRegistry.h"
 #include "game/Map.h"
 #include "game/Resource.h"
 #include "game/TileRegistry.h"
@@ -75,6 +76,11 @@ class GameState {
     [[nodiscard]] const std::vector<std::unique_ptr<Unit>> &units() const;
     [[nodiscard]] std::vector<std::unique_ptr<Unit>> &units();
 
+    // -- FactionRegistry -----------------------------------------------
+
+    [[nodiscard]] const FactionRegistry &factionRegistry() const;
+    [[nodiscard]] FactionRegistry &mutableFactionRegistry();
+
     // -- Faction resources ---------------------------------------------
 
     [[nodiscard]] const Resource &factionResources() const;
@@ -91,6 +97,7 @@ class GameState {
     std::vector<City> cities_;
     std::vector<Building> buildings_;
     std::vector<std::unique_ptr<Unit>> units_;
+    FactionRegistry factionRegistry_;
     Resource factionResources_;
 
     CityId nextCityId_ = 1;

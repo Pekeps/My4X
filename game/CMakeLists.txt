@@ -14,6 +14,7 @@ add_library(my4x_game STATIC
     src/TurnResolver.cpp
     src/SaveLoad.cpp
     src/Faction.cpp
+    src/FactionRegistry.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)

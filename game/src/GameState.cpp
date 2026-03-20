@@ -131,6 +131,12 @@ const std::vector<std::unique_ptr<Unit>> &GameState::units() const { return unit
 
 std::vector<std::unique_ptr<Unit>> &GameState::units() { return units_; }
 
+// -- FactionRegistry ---------------------------------------------------
+
+const FactionRegistry &GameState::factionRegistry() const { return factionRegistry_; }
+
+FactionRegistry &GameState::mutableFactionRegistry() { return factionRegistry_; }
+
 // -- Faction resources -------------------------------------------------
 
 const Resource &GameState::factionResources() const { return factionResources_; }
