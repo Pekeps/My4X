@@ -1,14 +1,16 @@
 BUILD_DIR := build
 BUILD_TYPE ?= Debug
+JOBS ?= $(shell nproc)
 SOURCES := $(shell find engine game app -name '*.cpp' -o -name '*.h')
+CMAKE_FLAGS := -B $(BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
 
 .PHONY: build test lint format format-check clean configure ci
 
 configure:
-	cmake -B $(BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
+	cmake $(CMAKE_FLAGS)
 
 build: configure
-	cmake --build $(BUILD_DIR)
+	cmake --build $(BUILD_DIR) -- -j$(JOBS)
 
 test: build
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
@@ -35,7 +37,7 @@ ci:
 	if [ $$? -ne 0 ]; then echo "FAIL: format"; echo "$$out"; failed=1; fi; \
 	\
 	echo "--- build ---"; \
-	out=$$(cmake -B $(BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) 2>&1 && cmake --build $(BUILD_DIR) 2>&1); \
+	out=$$(cmake $(CMAKE_FLAGS) 2>&1 && cmake --build $(BUILD_DIR) -- -j$(JOBS) 2>&1); \
 	if [ $$? -ne 0 ]; then echo "FAIL: build"; echo "$$out" | grep -E "error:|FAILED"; failed=1; fi; \
 	\
 	if [ $$failed -eq 0 ]; then \
