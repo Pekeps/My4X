@@ -17,6 +17,8 @@ game::UnitTypeRegistry makeTestRegistry() {
     return reg;
 }
 
+constexpr game::FactionId TEST_FACTION = 1;
+
 } // namespace
 
 TEST(SerializationTest, EmptyGameStateRoundTrip) {
@@ -148,12 +150,12 @@ TEST(SerializationTest, UnitRoundTrip) {
     game::GameState state(10, 10, 42);
     auto reg = makeTestRegistry();
 
-    auto warrior = std::make_unique<game::Warrior>(3, 4, reg);
+    auto warrior = std::make_unique<game::Warrior>(3, 4, reg, TEST_FACTION);
     warrior->takeDamage(30);
     warrior->moveTo(4, 4);
     state.addUnit(std::move(warrior));
 
-    auto fullHealthWarrior = std::make_unique<game::Warrior>(7, 7, reg);
+    auto fullHealthWarrior = std::make_unique<game::Warrior>(7, 7, reg, TEST_FACTION);
     state.addUnit(std::move(fullHealthWarrior));
 
     std::string data = game::serializeGameState(state);
@@ -254,7 +256,7 @@ TEST(SerializationTest, TileRegistryRebuiltCorrectly) {
     state.addCity(std::move(city));
 
     state.addBuilding(game::makeFarm(6, 6));
-    state.addUnit(std::make_unique<game::Warrior>(7, 7, reg));
+    state.addUnit(std::make_unique<game::Warrior>(7, 7, reg, TEST_FACTION));
 
     std::string data = game::serializeGameState(state);
     game::GameState restored = game::deserializeGameState(data);

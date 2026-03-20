@@ -2,6 +2,7 @@
 
 #include "game/Building.h"
 #include "game/City.h"
+#include "game/Faction.h"
 #include "game/DiplomacyManager.h"
 #include "game/FactionRegistry.h"
 #include "game/Map.h"
@@ -82,6 +83,9 @@ class GameState {
     void removeUnit(std::size_t index);
     [[nodiscard]] const std::vector<std::unique_ptr<Unit>> &units() const;
     [[nodiscard]] std::vector<std::unique_ptr<Unit>> &units();
+
+    /// Return pointers to all units owned by the given faction.
+    [[nodiscard]] std::vector<const Unit *> unitsForFaction(FactionId factionId) const;
 
     // -- FactionRegistry -----------------------------------------------
 

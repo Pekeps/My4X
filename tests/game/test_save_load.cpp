@@ -76,7 +76,7 @@ TEST(SaveLoadTest, RoundTripFullState) {
     state.addBuilding(game::makeFarm(5, 5));
     state.addBuilding(game::makeMine(2, 2));
 
-    auto warrior = std::make_unique<game::Warrior>(7, 7, reg);
+    auto warrior = std::make_unique<game::Warrior>(7, 7, reg, 1);
     warrior->takeDamage(20);
     state.addUnit(std::move(warrior));
 
@@ -110,6 +110,7 @@ TEST(SaveLoadTest, RoundTripFullState) {
     ASSERT_EQ(loaded.units().size(), 1U);
     EXPECT_EQ(loaded.units()[0]->name(), "Warrior");
     EXPECT_EQ(loaded.units()[0]->health(), 80);
+    EXPECT_EQ(loaded.units()[0]->factionId(), 1U);
 
     EXPECT_EQ(loaded.factionResources().gold, 100);
     EXPECT_EQ(loaded.factionResources().production, 50);

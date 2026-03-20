@@ -5,8 +5,9 @@
 
 namespace game {
 
-Unit::Unit(int row, int col, const UnitTemplate &tmpl)
-    : row_(row), col_(col), health_(tmpl.maxHealth), movementRemaining_(tmpl.movementRange), template_(tmpl) {}
+Unit::Unit(int row, int col, const UnitTemplate &tmpl, FactionId factionId)
+    : row_(row), col_(col), health_(tmpl.maxHealth), movementRemaining_(tmpl.movementRange), factionId_(factionId),
+      template_(tmpl) {}
 
 int Unit::row() const { return row_; }
 int Unit::col() const { return col_; }
@@ -40,6 +41,8 @@ void Unit::setMovementRemaining(int remaining) {
 }
 
 const std::string &Unit::name() const { return template_.name; }
+
+FactionId Unit::factionId() const { return factionId_; }
 
 const UnitTemplate &Unit::unitTemplate() const { return template_; }
 
