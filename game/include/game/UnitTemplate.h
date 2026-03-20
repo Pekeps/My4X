@@ -22,6 +22,9 @@ struct UnitTemplate {
     /// 1 = melee, >1 = ranged (needed for Phase 3 combat).
     int attackRange = 1;
 
+    /// How far this unit can see (in hex tiles). Used by the fog-of-war system.
+    int sightRange = 2;
+
     /// Resource cost to produce this unit in a city build queue.
     Resource productionCost;
 };
