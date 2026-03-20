@@ -28,6 +28,9 @@ class FactionRegistry {
     /// Return a const reference to all registered factions.
     [[nodiscard]] const std::vector<Faction> &allFactions() const;
 
+    /// Return a mutable reference to all registered factions.
+    [[nodiscard]] std::vector<Faction> &allMutableFactions();
+
     /// Return pointers to all player-controlled factions.
     [[nodiscard]] std::vector<const Faction *> playerFactions() const;
 

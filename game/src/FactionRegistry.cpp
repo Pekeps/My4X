@@ -29,6 +29,8 @@ Faction &FactionRegistry::getMutableFaction(FactionId id) {
 
 const std::vector<Faction> &FactionRegistry::allFactions() const { return factions_; }
 
+std::vector<Faction> &FactionRegistry::allMutableFactions() { return factions_; }
+
 std::vector<const Faction *> FactionRegistry::playerFactions() const {
     std::vector<const Faction *> result;
     for (const auto &faction : factions_) {

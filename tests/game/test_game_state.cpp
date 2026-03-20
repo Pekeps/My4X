@@ -56,6 +56,45 @@ TEST(GameStateTest, RemoveNonExistentCityThrows) {
     EXPECT_THROW(state.removeCity(999), std::out_of_range);
 }
 
+// -- City-by-faction queries -------------------------------------------
+
+TEST(GameStateTest, CitiesForFactionReturnsMatchingCities) {
+    game::GameState state(4, 4);
+    state.addCity(game::City("Rome", 0, 0, 1));
+    state.addCity(game::City("Athens", 1, 1, 2));
+    state.addCity(game::City("Sparta", 2, 2, 1));
+
+    auto faction1Cities = state.citiesForFaction(1);
+    EXPECT_EQ(faction1Cities.size(), 2);
+    EXPECT_EQ(faction1Cities[0]->name(), "Rome");
+    EXPECT_EQ(faction1Cities[1]->name(), "Sparta");
+
+    auto faction2Cities = state.citiesForFaction(2);
+    EXPECT_EQ(faction2Cities.size(), 1);
+    EXPECT_EQ(faction2Cities[0]->name(), "Athens");
+}
+
+TEST(GameStateTest, CitiesForFactionReturnsEmptyForUnknownFaction) {
+    game::GameState state(4, 4);
+    state.addCity(game::City("Rome", 0, 0, 1));
+    auto result = state.citiesForFaction(99);
+    EXPECT_TRUE(result.empty());
+}
+
+TEST(GameStateTest, MutableCitiesForFaction) {
+    game::GameState state(4, 4);
+    state.addCity(game::City("Rome", 0, 0, 1));
+    state.addCity(game::City("Athens", 1, 1, 2));
+
+    auto faction1Cities = state.mutableCitiesForFaction(1);
+    ASSERT_EQ(faction1Cities.size(), 1);
+    faction1Cities[0]->setFactionId(2);
+
+    // After capture, faction 1 has no cities, faction 2 has both
+    EXPECT_TRUE(state.citiesForFaction(1).empty());
+    EXPECT_EQ(state.citiesForFaction(2).size(), 2);
+}
+
 // -- Building tests ----------------------------------------------------
 
 TEST(GameStateTest, AddBuildingRegistersInTileRegistry) {
