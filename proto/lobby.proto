@@ -1,0 +1,74 @@
+syntax = "proto3";
+package game_proto;
+
+import "common.proto";
+
+// Lobby-related messages.
+
+message GameSettings {
+  int32 map_width = 1;
+  int32 map_height = 2;
+  int32 max_players = 3;
+  string game_name = 4;
+  int32 max_turns = 5;
+}
+
+message PlayerInfo {
+  PlayerId player_id = 1;
+  string display_name = 2;
+  int32 faction_id = 3;
+  bool is_ready = 4;
+}
+
+message GameListing {
+  GameId game_id = 1;
+  GameSettings settings = 2;
+  repeated PlayerInfo players = 3;
+  GameStatus status = 4;
+}
+
+enum GameStatus {
+  GAME_STATUS_UNSPECIFIED = 0;
+  GAME_STATUS_WAITING = 1;
+  GAME_STATUS_IN_PROGRESS = 2;
+  GAME_STATUS_FINISHED = 3;
+}
+
+// Lobby RPC messages.
+
+message CreateGameRequest {
+  GameSettings settings = 1;
+  PlayerInfo host = 2;
+}
+
+message CreateGameResponse {
+  GameId game_id = 1;
+}
+
+message ListGamesRequest {
+  // Empty — returns all available games.
+}
+
+message ListGamesResponse {
+  repeated GameListing games = 1;
+}
+
+message JoinGameRequest {
+  GameId game_id = 1;
+  PlayerInfo player = 2;
+}
+
+message JoinGameResponse {
+  bool success = 1;
+  string error_message = 2;
+  GameListing game = 3;
+}
+
+message LeaveGameRequest {
+  GameId game_id = 1;
+  PlayerId player_id = 2;
+}
+
+message LeaveGameResponse {
+  bool success = 1;
+}

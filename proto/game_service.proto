@@ -1,0 +1,51 @@
+syntax = "proto3";
+package game_proto;
+
+import "common.proto";
+import "game_action.proto";
+import "game_event.proto";
+import "game_state.proto";
+
+// Request to submit a player action during their turn.
+message SubmitActionRequest {
+  GameId game_id = 1;
+  PlayerId player_id = 2;
+  GameAction action = 3;
+}
+
+// Response after submitting an action.
+message SubmitActionResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Request to retrieve the full game state (for initial sync or reconnection).
+message GetGameStateRequest {
+  GameId game_id = 1;
+  PlayerId player_id = 2;
+}
+
+// Response containing a full game state snapshot.
+message GetGameStateResponse {
+  GameState state = 1;
+  int32 your_faction_id = 2;
+}
+
+// Request to subscribe to real-time game events.
+message SubscribeEventsRequest {
+  GameId game_id = 1;
+  PlayerId player_id = 2;
+}
+
+// Service for in-game communication: submitting actions, querying state,
+// and subscribing to a server-streaming event feed.
+service GameService {
+  // Submit a game action (move, attack, build, end turn).
+  rpc SubmitAction(SubmitActionRequest) returns (SubmitActionResponse);
+
+  // Get the full game state snapshot (used for initial sync and reconnection).
+  rpc GetGameState(GetGameStateRequest) returns (GetGameStateResponse);
+
+  // Subscribe to a stream of game events pushed by the server.
+  rpc SubscribeEvents(SubscribeEventsRequest) returns (stream GameEvent);
+}
