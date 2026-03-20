@@ -60,6 +60,10 @@ class BuildQueue {
     std::optional<BuildQueueResult> applyProduction(int amount);
 
     void cancel();
+
+    /// Remove all items from the queue and reset accumulated production.
+    void clear();
+
     [[nodiscard]] bool isEmpty() const;
 
     /// Returns a copy of all queued items (for serialization).

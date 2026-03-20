@@ -16,6 +16,7 @@
 #include "game/AttackAction.h"
 #include "game/BuildQueue.h"
 #include "game/Building.h"
+#include "game/CaptureAction.h"
 #include "game/City.h"
 #include "game/CombatLog.h"
 #include "game/DiplomacyManager.h"
@@ -685,7 +686,8 @@ static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile
 
 /// Try to move the selected unit to the clicked tile (adjacent, empty).
 /// Returns true if movement occurred.
-static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &tile, int selectedUnit) {
+static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &tile, int selectedUnit,
+                        game::CombatLog &combatLog) {
     auto &sel = state.units()[selectedUnit];
     if (sel->movementRemaining() <= 0) {
         return false;
@@ -697,6 +699,34 @@ static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &ti
     state.mutableRegistry().unregisterUnit(sel->row(), sel->col(), sel.get());
     sel->moveTo(tile.row, tile.col);
     state.mutableRegistry().registerUnit(sel->row(), sel->col(), sel.get());
+
+    // After movement, attempt city capture.
+    game::CaptureAction captureAction(static_cast<std::size_t>(selectedUnit));
+    auto captureResult = captureAction.execute(state);
+    if (captureResult.executed) {
+        // Log the capture event.
+        game::CombatEvent captureEvent;
+        captureEvent.isCaptureEvent = true;
+        captureEvent.capturedCityName = captureResult.capturedCityName;
+        captureEvent.attackerFactionId = captureResult.newOwner;
+        captureEvent.defenderFactionId = captureResult.previousOwner;
+        captureEvent.turn = state.getTurn();
+        captureEvent.tileRow = tile.row;
+        captureEvent.tileCol = tile.col;
+
+        // Look up faction names for the log.
+        const auto *capturerFaction = state.factionRegistry().findFaction(captureResult.newOwner);
+        if (capturerFaction != nullptr) {
+            captureEvent.attackerFactionName = capturerFaction->name();
+        }
+        const auto *previousFaction = state.factionRegistry().findFaction(captureResult.previousOwner);
+        if (previousFaction != nullptr) {
+            captureEvent.defenderFactionName = previousFaction->name();
+        }
+
+        combatLog.append(captureEvent);
+    }
+
     return true;
 }
 
@@ -731,7 +761,7 @@ static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::T
     }
 
     // Click on empty tile — try to move.
-    if (clickedUnit == NO_SELECTION && tryMoveUnit(state, tile, selectedUnit)) {
+    if (clickedUnit == NO_SELECTION && tryMoveUnit(state, tile, selectedUnit, combatLog)) {
         return true;
     }
 

@@ -27,6 +27,7 @@ add_executable(my4x_tests
     game/test_unit_experience.cpp
     game/test_unit_death_cleanup.cpp
     game/test_fog_of_war.cpp
+    game/test_capture_action.cpp
 )
 
 target_link_libraries(my4x_tests PRIVATE my4x_game my4x_engine GTest::gtest_main)

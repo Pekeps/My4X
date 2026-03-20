@@ -40,8 +40,20 @@ constexpr float LOG_PANEL_ROUNDNESS = 0.04F;
 /// Number of polygon segments for rounded corners.
 constexpr int LOG_PANEL_SEGMENTS = 6;
 
+/// Color for city capture event text.
+const Color LOG_CAPTURE_COL = {100, 200, 255, 255};
+
 /// Format a single combat event into a display string.
 std::string formatCombatEvent(const game::CombatEvent &event) {
+    // Handle city capture events differently.
+    if (event.isCaptureEvent) {
+        std::string capturerLabel = event.attackerFactionName.empty()
+                                        ? ("Faction " + std::to_string(event.attackerFactionId))
+                                        : event.attackerFactionName;
+        std::string result = capturerLabel + " captured " + event.capturedCityName;
+        return result;
+    }
+
     std::string result;
 
     // Use stored names if available, otherwise fall back to faction IDs.
@@ -134,8 +146,12 @@ void drawCombatLogPanel(const game::CombatLog &combatLog, int screenWidth, int s
         // Older events are dimmer.
         Color textColor = (i < displayCount / 2) ? LOG_DIM_COL : LOG_TEXT_COL;
 
+        // Highlight capture events.
+        if (event.isCaptureEvent) {
+            textColor = LOG_CAPTURE_COL;
+        }
         // Highlight kills.
-        if (event.defenderDied || event.attackerDied) {
+        else if (event.defenderDied || event.attackerDied) {
             textColor = LOG_KILL_COL;
         }
 
