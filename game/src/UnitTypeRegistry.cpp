@@ -13,6 +13,7 @@ constexpr int WARRIOR_ATTACK = 15;
 constexpr int WARRIOR_DEFENSE = 10;
 constexpr int WARRIOR_MOVEMENT = 2;
 constexpr int WARRIOR_ATTACK_RANGE = 1;
+constexpr int WARRIOR_SIGHT_RANGE = 2;
 constexpr int WARRIOR_PRODUCTION_COST = 20;
 
 // ── Archer stats ─────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ constexpr int ARCHER_ATTACK = 12;
 constexpr int ARCHER_DEFENSE = 5;
 constexpr int ARCHER_MOVEMENT = 2;
 constexpr int ARCHER_ATTACK_RANGE = 3;
+constexpr int ARCHER_SIGHT_RANGE = 3;
 constexpr int ARCHER_PRODUCTION_COST = 25;
 
 // ── Settler stats ────────────────────────────────────────────────────────────
@@ -29,6 +31,7 @@ constexpr int SETTLER_ATTACK = 0;
 constexpr int SETTLER_DEFENSE = 3;
 constexpr int SETTLER_MOVEMENT = 3;
 constexpr int SETTLER_ATTACK_RANGE = 0;
+constexpr int SETTLER_SIGHT_RANGE = 2;
 constexpr int SETTLER_PRODUCTION_COST = 40;
 
 } // namespace
@@ -69,6 +72,7 @@ void UnitTypeRegistry::registerDefaults() {
                          .defense = WARRIOR_DEFENSE,
                          .movementRange = WARRIOR_MOVEMENT,
                          .attackRange = WARRIOR_ATTACK_RANGE,
+                         .sightRange = WARRIOR_SIGHT_RANGE,
                          .productionCost = Resource{.gold = 0, .production = WARRIOR_PRODUCTION_COST, .food = 0},
                      });
 
@@ -80,6 +84,7 @@ void UnitTypeRegistry::registerDefaults() {
                          .defense = ARCHER_DEFENSE,
                          .movementRange = ARCHER_MOVEMENT,
                          .attackRange = ARCHER_ATTACK_RANGE,
+                         .sightRange = ARCHER_SIGHT_RANGE,
                          .productionCost = Resource{.gold = 0, .production = ARCHER_PRODUCTION_COST, .food = 0},
                      });
 
@@ -91,6 +96,7 @@ void UnitTypeRegistry::registerDefaults() {
                          .defense = SETTLER_DEFENSE,
                          .movementRange = SETTLER_MOVEMENT,
                          .attackRange = SETTLER_ATTACK_RANGE,
+                         .sightRange = SETTLER_SIGHT_RANGE,
                          .productionCost = Resource{.gold = 0, .production = SETTLER_PRODUCTION_COST, .food = 0},
                      });
 }

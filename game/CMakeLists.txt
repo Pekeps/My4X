@@ -20,6 +20,7 @@ add_library(my4x_game STATIC
     src/Combat.cpp
     src/CombatLog.cpp
     src/AttackAction.cpp
+    src/FogOfWar.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
