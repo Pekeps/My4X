@@ -35,7 +35,7 @@ TEST(TurnResolverTest, ResetsUnitMovement) {
     auto state = makeTestState();
     auto reg = makeTestRegistry();
     auto warrior = std::make_unique<Warrior>(0, 0, reg, 1);
-    warrior->moveTo(0, 1);
+    warrior->moveTo(0, 1, 1);
     EXPECT_LT(warrior->movementRemaining(), warrior->movement());
     state.addUnit(std::move(warrior));
 
@@ -202,7 +202,7 @@ TEST(TurnResolverTest, FullTurnResolutionWithBuildings) {
     state.addBuilding(makeFarm(3, 3));
 
     auto warrior = std::make_unique<Warrior>(0, 0, reg, 1);
-    warrior->moveTo(0, 1);
+    warrior->moveTo(0, 1, 1);
     state.addUnit(std::move(warrior));
 
     EXPECT_EQ(state.getTurn(), 1);

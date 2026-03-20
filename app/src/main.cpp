@@ -23,6 +23,7 @@
 #include "game/Faction.h"
 #include "game/FactionRegistry.h"
 #include "game/GameState.h"
+#include "game/MoveAction.h"
 #include "game/NeutralAI.h"
 #include "game/SaveLoad.h"
 #include "game/TerrainType.h"
@@ -688,17 +689,11 @@ static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile
 /// Returns true if movement occurred.
 static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &tile, int selectedUnit,
                         game::CombatLog &combatLog) {
-    auto &sel = state.units()[selectedUnit];
-    if (sel->movementRemaining() <= 0) {
+    game::MoveAction action(static_cast<std::size_t>(selectedUnit), tile.row, tile.col);
+    auto result = action.execute(state);
+    if (!result.executed) {
         return false;
     }
-    int dist = game::AttackAction::hexDistance(sel->row(), sel->col(), tile.row, tile.col);
-    if (dist != 1) {
-        return false;
-    }
-    state.mutableRegistry().unregisterUnit(sel->row(), sel->col(), sel.get());
-    sel->moveTo(tile.row, tile.col);
-    state.mutableRegistry().registerUnit(sel->row(), sel->col(), sel.get());
 
     // After movement, attempt city capture.
     game::CaptureAction captureAction(static_cast<std::size_t>(selectedUnit));

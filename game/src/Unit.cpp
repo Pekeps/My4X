@@ -12,11 +12,12 @@ Unit::Unit(int row, int col, const UnitTemplate &tmpl, FactionId factionId)
 int Unit::row() const { return row_; }
 int Unit::col() const { return col_; }
 
-void Unit::moveTo(int row, int col) {
-    assert(movementRemaining_ > 0);
+void Unit::moveTo(int row, int col, int cost) {
+    assert(cost > 0);
+    assert(movementRemaining_ >= cost);
     row_ = row;
     col_ = col;
-    --movementRemaining_;
+    movementRemaining_ -= cost;
 }
 
 int Unit::health() const { return health_; }

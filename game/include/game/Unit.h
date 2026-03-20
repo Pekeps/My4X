@@ -46,7 +46,10 @@ class Unit {
 
     [[nodiscard]] int row() const;
     [[nodiscard]] int col() const;
-    void moveTo(int row, int col);
+
+    /// Move this unit to the given position, deducting the specified movement
+    /// cost from its remaining movement points.
+    void moveTo(int row, int col, int cost);
 
     [[nodiscard]] int health() const;
     [[nodiscard]] int maxHealth() const;
