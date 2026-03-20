@@ -21,6 +21,7 @@ add_executable(my4x_tests
     engine/test_diplomacy_colors.cpp
     game/test_faction_ui_data.cpp
     game/test_combat.cpp
+    game/test_combat_log.cpp
 )
 
 target_link_libraries(my4x_tests PRIVATE my4x_game my4x_engine GTest::gtest_main)
