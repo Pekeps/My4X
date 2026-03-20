@@ -81,6 +81,14 @@ class GameState {
     /// Add a unit and register it in the TileRegistry. Returns the index.
     std::size_t addUnit(std::unique_ptr<Unit> unit);
     void removeUnit(std::size_t index);
+
+    /// Remove all dead units (health <= 0) from the unit list and tile
+    /// registry.  Returns the number of units removed.  If @p selectedIndex
+    /// is not null, the pointed-to value is adjusted: cleared to -1 if the
+    /// selected unit was removed, or decremented for each removed unit whose
+    /// index was below the selected one.
+    std::size_t removeDeadUnits(int *selectedIndex = nullptr);
+
     [[nodiscard]] const std::vector<std::unique_ptr<Unit>> &units() const;
     [[nodiscard]] std::vector<std::unique_ptr<Unit>> &units();
 
