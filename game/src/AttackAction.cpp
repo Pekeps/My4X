@@ -3,6 +3,8 @@
 #include "game/Combat.h"
 #include "game/DiplomacyManager.h"
 #include "game/GameState.h"
+#include "game/Map.h"
+#include "game/TerrainType.h"
 #include "game/Unit.h"
 
 #include <algorithm>
@@ -88,6 +90,14 @@ AttackResult AttackAction::execute(GameState &state) const {
     int distance = hexDistance(attacker.row(), attacker.col(), target.row(), target.col());
     CombatContext context;
     context.rangedAttack = (distance > MELEE_RANGE);
+
+    // Look up terrain defense bonuses from the map.
+    const auto &map = state.map();
+    const auto &defenderTerrain = map.tile(target.row(), target.col()).terrainType();
+    context.terrainDefenseBonus = getTerrainProperties(defenderTerrain).defenseModifier;
+
+    const auto &attackerTerrain = map.tile(attacker.row(), attacker.col()).terrainType();
+    context.attackerTerrainDefenseBonus = getTerrainProperties(attackerTerrain).defenseModifier;
 
     // Resolve combat (pure function — does not mutate units).
     result.combat = resolveCombat(attacker, target, context);

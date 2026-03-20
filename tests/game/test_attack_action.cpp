@@ -4,6 +4,7 @@
 #include "game/DiplomacyManager.h"
 #include "game/FactionRegistry.h"
 #include "game/GameState.h"
+#include "game/TerrainType.h"
 #include "game/Unit.h"
 #include "game/UnitTypeRegistry.h"
 #include "game/Warrior.h"
@@ -35,6 +36,8 @@ void registerCustom(game::UnitTypeRegistry &reg, const std::string &name, int ma
 }
 
 /// Set up a basic game state with two factions at war for testing.
+/// All tiles in the combat zone are set to Plains to ensure deterministic
+/// terrain defense bonuses (zero) in existing tests.
 struct TestSetup {
     game::GameState state;
     game::FactionId factionA;
@@ -47,6 +50,14 @@ struct TestSetup {
 
         // Set factions at war.
         state.mutableDiplomacy().setRelation(factionA, factionB, game::DiplomacyState::War);
+
+        // Normalize all tiles to Plains so terrain defense bonuses are zero
+        // and existing damage calculations remain deterministic.
+        for (int r = 0; r < state.map().height(); ++r) {
+            for (int c = 0; c < state.map().width(); ++c) {
+                state.mutableMap().tile(r, c).setTerrainType(game::TerrainType::Plains);
+            }
+        }
     }
 };
 
