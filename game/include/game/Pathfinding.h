@@ -41,4 +41,30 @@ static constexpr int NEIGHBOR_DIRECTION_COUNT = 6;
 [[nodiscard]] std::vector<TileCoord> findPath(int startRow, int startCol, int goalRow, int goalCol, const Map &map,
                                               const TileRegistry &registry, FactionId factionId);
 
+/// A tile reachable within a unit's remaining movement points, along with
+/// the minimum movement cost required to reach it.
+struct ReachableTile {
+    TileCoord coord;
+    int cost; ///< Total movement cost from the starting tile.
+};
+
+/// Compute all tiles reachable from a starting position within a given
+/// movement budget using Dijkstra flood-fill.
+///
+/// Expands outward from (startRow, startCol), deducting terrain movement
+/// costs. Stops at tiles where remaining movement would become negative,
+/// at impassable terrain, and at enemy-occupied tiles.
+///
+/// The starting tile itself is NOT included in the returned set.
+///
+/// @param startRow     Starting tile row.
+/// @param startCol     Starting tile column.
+/// @param movementBudget Maximum movement points available.
+/// @param map          The game map (for terrain lookups).
+/// @param registry     Tile registry (for unit occupancy checks).
+/// @param factionId    Faction of the moving unit (enemy units block tiles).
+[[nodiscard]] std::vector<ReachableTile> computeMovementRange(int startRow, int startCol, int movementBudget,
+                                                              const Map &map, const TileRegistry &registry,
+                                                              FactionId factionId);
+
 } // namespace game
