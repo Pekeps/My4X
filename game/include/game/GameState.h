@@ -2,6 +2,7 @@
 
 #include "game/Building.h"
 #include "game/City.h"
+#include "game/DiplomacyManager.h"
 #include "game/FactionRegistry.h"
 #include "game/Map.h"
 #include "game/Resource.h"
@@ -81,6 +82,11 @@ class GameState {
     [[nodiscard]] const FactionRegistry &factionRegistry() const;
     [[nodiscard]] FactionRegistry &mutableFactionRegistry();
 
+    // -- DiplomacyManager ----------------------------------------------
+
+    [[nodiscard]] const DiplomacyManager &diplomacy() const;
+    [[nodiscard]] DiplomacyManager &mutableDiplomacy();
+
     // -- Faction resources ---------------------------------------------
 
     [[nodiscard]] const Resource &factionResources() const;
@@ -98,6 +104,7 @@ class GameState {
     std::vector<Building> buildings_;
     std::vector<std::unique_ptr<Unit>> units_;
     FactionRegistry factionRegistry_;
+    DiplomacyManager diplomacy_;
     Resource factionResources_;
 
     CityId nextCityId_ = 1;
