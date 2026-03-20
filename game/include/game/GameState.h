@@ -5,6 +5,7 @@
 #include "game/DiplomacyManager.h"
 #include "game/Faction.h"
 #include "game/FactionRegistry.h"
+#include "game/FogOfWar.h"
 #include "game/Map.h"
 #include "game/Resource.h"
 #include "game/TileRegistry.h"
@@ -110,6 +111,15 @@ class GameState {
     [[nodiscard]] const Resource &factionResources() const;
     [[nodiscard]] Resource &factionResources();
 
+    // -- Fog of War ----------------------------------------------------
+
+    [[nodiscard]] const FogOfWar &fogOfWar() const;
+    [[nodiscard]] FogOfWar &mutableFogOfWar();
+
+    /// Recalculate fog of war visibility for the given faction based on
+    /// current unit and city positions.
+    void recalculateFog(FactionId factionId);
+
     void setTurn(int turn);
     [[nodiscard]] CityId nextCityId() const;
     [[nodiscard]] BuildingId nextBuildingId() const;
@@ -118,6 +128,7 @@ class GameState {
     int turn_ = 1;
     Map map_;
     TileRegistry registry_;
+    FogOfWar fog_;
     std::vector<City> cities_;
     std::vector<Building> buildings_;
     std::vector<std::unique_ptr<Unit>> units_;

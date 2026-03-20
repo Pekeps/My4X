@@ -6,9 +6,10 @@
 
 namespace game {
 
-GameState::GameState(int mapRows, int mapCols) : map_(mapRows, mapCols) {}
+GameState::GameState(int mapRows, int mapCols) : map_(mapRows, mapCols), fog_(mapRows, mapCols) {}
 
-GameState::GameState(int mapRows, int mapCols, std::uint64_t seed) : map_(mapRows, mapCols, seed) {}
+GameState::GameState(int mapRows, int mapCols, std::uint64_t seed)
+    : map_(mapRows, mapCols, seed), fog_(mapRows, mapCols) {}
 
 // -- Turn --------------------------------------------------------------
 
@@ -201,6 +202,14 @@ FactionRegistry &GameState::mutableFactionRegistry() { return factionRegistry_; 
 const DiplomacyManager &GameState::diplomacy() const { return diplomacy_; }
 
 DiplomacyManager &GameState::mutableDiplomacy() { return diplomacy_; }
+
+// -- Fog of War --------------------------------------------------------
+
+const FogOfWar &GameState::fogOfWar() const { return fog_; }
+
+FogOfWar &GameState::mutableFogOfWar() { return fog_; }
+
+void GameState::recalculateFog(FactionId factionId) { fog_.recalculate(factionId, units_, cities_, map_); }
 
 // -- Faction resources -------------------------------------------------
 
