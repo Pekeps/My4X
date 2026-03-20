@@ -54,6 +54,12 @@ class GameState {
     /// Find a city by ID, or nullptr if not found.
     [[nodiscard]] City *findCity(CityId id);
 
+    /// Return pointers to all cities owned by the given faction.
+    [[nodiscard]] std::vector<const City *> citiesForFaction(int factionId) const;
+
+    /// Return mutable pointers to all cities owned by the given faction.
+    [[nodiscard]] std::vector<City *> mutableCitiesForFaction(int factionId);
+
     /// Add a city preserving its existing ID (for deserialization).
     void restoreCity(City city);
     void setNextCityId(CityId id);

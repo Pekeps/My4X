@@ -16,6 +16,19 @@ TEST(CityTest, ConstructionWithFaction) {
     EXPECT_EQ(city.factionId(), 2);
 }
 
+TEST(CityTest, SetFactionIdChangesOwnership) {
+    game::City city("Outpost", 3, 3, 1);
+    EXPECT_EQ(city.factionId(), 1);
+    city.setFactionId(2);
+    EXPECT_EQ(city.factionId(), 2);
+}
+
+TEST(CityTest, SetFactionIdToZero) {
+    game::City city("Neutral", 0, 0, 5);
+    city.setFactionId(0);
+    EXPECT_EQ(city.factionId(), 0);
+}
+
 TEST(CityTest, CenterTileInFootprint) {
     game::City city("TestCity", 5, 3);
     EXPECT_TRUE(city.containsTile(5, 3));

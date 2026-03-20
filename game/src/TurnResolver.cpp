@@ -2,6 +2,8 @@
 
 #include "game/Building.h"
 #include "game/City.h"
+#include "game/Faction.h"
+#include "game/FactionRegistry.h"
 #include "game/Resource.h"
 
 namespace game {
@@ -22,6 +24,22 @@ Resource collectCityYields(const City &city, const GameState &state) {
     return total;
 }
 
+/// Route gold yields to the owning faction's stockpile.
+/// If the faction exists in the registry, gold goes there;
+/// otherwise it falls back to the global factionResources().
+void routeGoldToFaction(GameState &state, int factionId, int gold) {
+    if (factionId > 0) {
+        auto targetId = static_cast<FactionId>(factionId);
+        for (Faction &faction : state.mutableFactionRegistry().allMutableFactions()) {
+            if (faction.id() == targetId) {
+                faction.stockpile().gold += gold;
+                return;
+            }
+        }
+    }
+    state.factionResources().gold += gold;
+}
+
 } // namespace
 
 void resolveTurn(GameState &state) {
@@ -30,7 +48,7 @@ void resolveTurn(GameState &state) {
         Resource yields = collectCityYields(city, state);
 
         // Gold goes to the owning faction's stockpile.
-        state.factionResources().gold += yields.gold;
+        routeGoldToFaction(state, city.factionId(), yields.gold);
 
         // Production: base city production + building production yields.
         int totalProduction = City::productionPerTurn() + yields.production;

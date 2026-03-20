@@ -22,6 +22,7 @@ class City {
     [[nodiscard]] int centerRow() const;
     [[nodiscard]] int centerCol() const;
     [[nodiscard]] int factionId() const;
+    void setFactionId(int newFactionId);
     [[nodiscard]] int population() const;
 
     void growPopulation(int amount);
