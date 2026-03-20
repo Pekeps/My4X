@@ -21,6 +21,7 @@ add_executable(my4x_tests
     engine/test_diplomacy_colors.cpp
     engine/test_combat_effects.cpp
     engine/test_particle_system.cpp
+    engine/test_model_manager.cpp
     game/test_faction_ui_data.cpp
     game/test_combat.cpp
     game/test_combat_log.cpp

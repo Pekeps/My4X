@@ -12,6 +12,7 @@ add_library(my4x_engine STATIC
     src/RangeOverlay.cpp
     src/Minimap.cpp
     src/ParticleSystem.cpp
+    src/ModelManager.cpp
 )
 
 target_include_directories(my4x_engine PUBLIC include)
