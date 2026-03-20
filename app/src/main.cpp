@@ -498,10 +498,12 @@ static void handleBuildActions(game::GameState &state, game::CityId cityId,
 static void processTurn(game::GameState &state) {
     state.nextTurn();
 
-    // Reset unit movement and clear level-up indicators from previous turn.
+    // Reset unit movement and clear level-up indicators (skip dead units)
     for (auto &unit : state.units()) {
-        unit->resetMovement();
-        unit->clearLevelUpFlag();
+        if (unit->isAlive()) {
+            unit->resetMovement();
+            unit->clearLevelUpFlag();
+        }
     }
 
     // Apply city production to build queues
@@ -712,6 +714,9 @@ static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord
 static void handleInput(game::GameState &state, const std::optional<engine::hex::TileCoord> &hoveredTile,
                         int &selectedUnit, std::optional<game::CityId> &selectedCity, CombatFlash &attackerFlash,
                         CombatFlash &defenderFlash) {
+    // Clean up any dead units and adjust selected unit index accordingly.
+    state.removeDeadUnits(&selectedUnit);
+
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hoveredTile) {
         bool unitHandled = handleUnitClick(state, *hoveredTile, selectedUnit, attackerFlash, defenderFlash);
         if (!unitHandled) {

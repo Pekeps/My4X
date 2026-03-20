@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <utility>
 
 namespace game {
 
@@ -145,6 +146,34 @@ void GameState::removeUnit(std::size_t index) {
     auto &unit = units_.at(index);
     registry_.unregisterUnit(unit->row(), unit->col(), unit.get());
     units_.erase(units_.begin() + static_cast<std::ptrdiff_t>(index));
+}
+
+std::size_t GameState::removeDeadUnits(int *selectedIndex) {
+    std::size_t removed = 0;
+
+    // Walk backwards so erasing doesn't invalidate earlier indices.
+    for (auto i = static_cast<std::ptrdiff_t>(units_.size()) - 1; i >= 0; --i) {
+        auto idx = static_cast<std::size_t>(i);
+        if (!units_[idx]->isAlive()) {
+            // Unregister from tile registry before erasing.
+            registry_.unregisterUnit(units_[idx]->row(), units_[idx]->col(), units_[idx].get());
+            units_.erase(units_.begin() + i);
+            ++removed;
+
+            if (selectedIndex != nullptr) {
+                if (std::cmp_equal(*selectedIndex, idx)) {
+                    // The selected unit was removed — clear selection.
+                    static constexpr int NO_SELECTION = -1;
+                    *selectedIndex = NO_SELECTION;
+                } else if (std::cmp_greater(*selectedIndex, idx)) {
+                    // A unit below the selected one was removed — shift down.
+                    --(*selectedIndex);
+                }
+            }
+        }
+    }
+
+    return removed;
 }
 
 const std::vector<std::unique_ptr<Unit>> &GameState::units() const { return units_; }
