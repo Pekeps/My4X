@@ -39,6 +39,7 @@ add_executable(my4x_tests
     game/test_movement_range.cpp
     game/test_zone_of_control.cpp
     engine/test_animation_controller.cpp
+    engine/test_audio_manager.cpp
 )
 
 target_link_libraries(my4x_tests PRIVATE my4x_game my4x_engine GTest::gtest_main)
