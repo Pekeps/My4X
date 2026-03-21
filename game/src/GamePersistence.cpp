@@ -41,23 +41,6 @@ class Statement {
     sqlite3_stmt *stmt_ = nullptr;
 };
 
-/// Helper to safely extract text from a sqlite3 column as a std::string.
-/// Uses sqlite3_column_blob + sqlite3_column_bytes to avoid reinterpret_cast
-/// from unsigned char* returned by sqlite3_column_text.
-/// Per SQLite docs, sqlite3_column_blob must be called BEFORE
-/// sqlite3_column_bytes to avoid invalidating internal buffers.
-std::string columnText(sqlite3_stmt *stmt, int col) {
-    const void *data = sqlite3_column_blob(stmt, col);
-    if (data == nullptr) {
-        return {};
-    }
-    int len = sqlite3_column_bytes(stmt, col);
-    if (len <= 0) {
-        return {};
-    }
-    return {static_cast<const char *>(data), static_cast<std::string::size_type>(len)};
-}
-
 } // namespace
 
 GamePersistence::GamePersistence(const std::string &dbPath) {
@@ -161,10 +144,6 @@ GameState GamePersistence::loadGame(const std::string &gameId) const {
 }
 
 std::vector<GameSummary> GamePersistence::listGames() const {
-    const char *sql = "SELECT id, name, turn, player_count, created_at, updated_at "
-                      "FROM games ORDER BY updated_at DESC;";
-    Statement stmt(db_, sql);
-
     static constexpr int COL_ID = 0;
     static constexpr int COL_NAME = 1;
     static constexpr int COL_TURN = 2;
@@ -173,14 +152,41 @@ std::vector<GameSummary> GamePersistence::listGames() const {
     static constexpr int COL_UPDATED_AT = 5;
 
     std::vector<GameSummary> results;
-    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
-        auto &summary = results.emplace_back();
-        summary.id = columnText(stmt.get(), COL_ID);
-        summary.name = columnText(stmt.get(), COL_NAME);
-        summary.turn = sqlite3_column_int(stmt.get(), COL_TURN);
-        summary.playerCount = sqlite3_column_int(stmt.get(), COL_PLAYER_COUNT);
-        summary.createdAt = columnText(stmt.get(), COL_CREATED_AT);
-        summary.updatedAt = columnText(stmt.get(), COL_UPDATED_AT);
+
+    auto callback = [](void *data, int argc, char **argv, char ** /*colNames*/) -> int {
+        static constexpr int EXPECTED_COLS = 6;
+        auto *vec = static_cast<std::vector<GameSummary> *>(data);
+        if (argc < EXPECTED_COLS) {
+            return 0;
+        }
+        auto &summary = vec->emplace_back();
+        if (argv[COL_ID] != nullptr) {
+            summary.id = argv[COL_ID];
+        }
+        if (argv[COL_NAME] != nullptr) {
+            summary.name = argv[COL_NAME];
+        }
+        if (argv[COL_TURN] != nullptr) {
+            summary.turn = std::stoi(argv[COL_TURN]);
+        }
+        if (argv[COL_PLAYER_COUNT] != nullptr) {
+            summary.playerCount = std::stoi(argv[COL_PLAYER_COUNT]);
+        }
+        if (argv[COL_CREATED_AT] != nullptr) {
+            summary.createdAt = argv[COL_CREATED_AT];
+        }
+        if (argv[COL_UPDATED_AT] != nullptr) {
+            summary.updatedAt = argv[COL_UPDATED_AT];
+        }
+        return 0;
+    };
+
+    char *errMsg = nullptr;
+    const char *sql = "SELECT id, name, turn, player_count, created_at, updated_at "
+                      "FROM games ORDER BY updated_at DESC;";
+    sqlite3_exec(db_, sql, callback, &results, &errMsg);
+    if (errMsg != nullptr) {
+        sqlite3_free(errMsg);
     }
 
     return results;
