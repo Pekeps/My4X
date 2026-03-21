@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
+#include <vector>
 
 namespace game {
 
@@ -89,6 +90,9 @@ class GameSession {
 
     /// Check whether a player is registered.
     [[nodiscard]] bool hasPlayer(PlayerId playerId) const;
+
+    /// Return all registered player IDs.
+    [[nodiscard]] std::vector<PlayerId> playerIds() const;
 
     // -- Action processing -----------------------------------------------
 

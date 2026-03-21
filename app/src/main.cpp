@@ -1,4 +1,4 @@
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-pro-type-vararg)
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-pro-type-vararg,cppcoreguidelines-avoid-non-const-global-variables)
 
 #include "engine/BuildingRenderer.h"
 #include "engine/Camera.h"
@@ -1093,8 +1093,8 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
 
     engine::drawUnits(state.units(), state.factionRegistry(), models, selectedUnit, PLAYER_FACTION_ID,
                       &state.diplomacy(), fog, &animator);
-    engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID,
-                       &state.diplomacy(), fog);
+    engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy(),
+                       fog);
     engine::drawBuildings(state.buildings(), models, state.factionRegistry(), fog, PLAYER_FACTION_ID);
 
     // Draw 3D combat effects (hit flashes and death effects).
@@ -1129,8 +1129,8 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
     engine::drawCombatLogPanel(combatLog, SCREEN_WIDTH, SCREEN_HEIGHT, combatLogScroll);
 
     // Draw minimap overlay.
-    engine::minimap::draw(state.map(), fog, PLAYER_FACTION_ID, state.units(), state.cities(),
-                          state.factionRegistry(), cam, SCREEN_WIDTH, SCREEN_HEIGHT);
+    engine::minimap::draw(state.map(), fog, PLAYER_FACTION_ID, state.units(), state.cities(), state.factionRegistry(),
+                          cam, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // Draw end-turn button.
     endTurnBtn.draw(SCREEN_WIDTH, SCREEN_HEIGHT, state.getTurn());
@@ -1318,4 +1318,4 @@ int main() {
     engine::window::shutdown();
     return 0;
 }
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-pro-type-vararg)
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-pro-type-vararg,cppcoreguidelines-avoid-non-const-global-variables)
