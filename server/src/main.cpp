@@ -14,7 +14,7 @@
 namespace {
 
 /// Default port the server listens on when none is specified.
-static constexpr int kDefaultPort = 50051;
+constexpr int kDefaultPort = 50051;
 
 /// Global pointer used by the signal handler to trigger graceful shutdown.
 std::atomic<grpc::Server *> g_server_ptr{nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
         try {
             port = std::stoi(argv[1]); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         } catch (const std::exception &ex) {
-            std::cerr << "Invalid port argument: " << argv[1]
-                      << "\n"; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            std::cerr << "Invalid port argument: " << argv[1] // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      << "\n";
             return 1;
         }
     }
