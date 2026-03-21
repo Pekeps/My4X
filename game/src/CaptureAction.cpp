@@ -135,4 +135,6 @@ bool CaptureAction::isCityDefended(const GameState &state, const City &city) {
     return false;
 }
 
+std::size_t CaptureAction::unitIndex() const { return unitIndex_; }
+
 } // namespace game

@@ -169,4 +169,8 @@ int AttackAction::hexDistance(int row1, int col1, int row2, int col2) {
     return (std::abs(x1 - x2) + std::abs(y1 - y2) + std::abs(z1 - z2)) / OFFSET_DIVISOR;
 }
 
+std::size_t AttackAction::attackerIndex() const { return attackerIndex_; }
+
+std::size_t AttackAction::targetIndex() const { return targetIndex_; }
+
 } // namespace game

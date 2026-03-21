@@ -31,6 +31,7 @@ add_library(my4x_game STATIC
     src/ZoneOfControl.cpp
     src/LobbyManager.cpp
     src/ReconnectionManager.cpp
+    src/PredictionManager.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)

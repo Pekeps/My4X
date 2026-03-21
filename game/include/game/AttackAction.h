@@ -70,6 +70,12 @@ class AttackAction {
     /// Uses odd-r offset coordinate conversion to cube coordinates.
     [[nodiscard]] static int hexDistance(int row1, int col1, int row2, int col2);
 
+    /// Return the index of the attacking unit.
+    [[nodiscard]] std::size_t attackerIndex() const;
+
+    /// Return the index of the target unit.
+    [[nodiscard]] std::size_t targetIndex() const;
+
   private:
     std::size_t attackerIndex_;
     std::size_t targetIndex_;

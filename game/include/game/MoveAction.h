@@ -50,6 +50,9 @@ class MoveAction {
     /// the result will have executed=false and the appropriate validation code.
     [[nodiscard]] MoveResult execute(GameState &state) const;
 
+    /// Return the index of the unit being moved.
+    [[nodiscard]] std::size_t unitIndex() const;
+
   private:
     std::size_t unitIndex_;
     int destRow_;
