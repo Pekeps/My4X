@@ -1,0 +1,57 @@
+syntax = "proto3";
+package game_proto;
+
+import "common.proto";
+
+// Events the server pushes to clients.
+
+message UnitMovedEvent {
+  uint32 unit_id = 1;
+  Position from = 2;
+  Position to = 3;
+  int32 movement_remaining = 4;
+}
+
+message CombatResolvedEvent {
+  uint32 attacker_id = 1;
+  uint32 defender_id = 2;
+  int32 attacker_health_after = 3;
+  int32 defender_health_after = 4;
+  bool attacker_destroyed = 5;
+  bool defender_destroyed = 6;
+}
+
+message TurnStartedEvent {
+  int32 turn_number = 1;
+  int32 active_faction_id = 2;
+}
+
+message CityCapturedEvent {
+  uint32 city_id = 1;
+  int32 previous_faction_id = 2;
+  int32 new_faction_id = 3;
+}
+
+message UnitProducedEvent {
+  uint32 city_id = 1;
+  uint32 unit_id = 2;
+  string template_key = 3;
+  Position spawn_position = 4;
+}
+
+message BuildingCompletedEvent {
+  uint32 city_id = 1;
+  uint32 building_id = 2;
+  string building_name = 3;
+}
+
+message GameEvent {
+  oneof event {
+    UnitMovedEvent unit_moved = 1;
+    CombatResolvedEvent combat_resolved = 2;
+    TurnStartedEvent turn_started = 3;
+    CityCapturedEvent city_captured = 4;
+    UnitProducedEvent unit_produced = 5;
+    BuildingCompletedEvent building_completed = 6;
+  }
+}

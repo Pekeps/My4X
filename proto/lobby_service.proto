@@ -1,0 +1,19 @@
+syntax = "proto3";
+package game_proto;
+
+import "lobby.proto";
+
+// Service for game lobby operations: creating, listing, joining, and leaving games.
+service LobbyService {
+  // Create a new game lobby with the given settings.
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse);
+
+  // List all available game lobbies.
+  rpc ListGames(ListGamesRequest) returns (ListGamesResponse);
+
+  // Join an existing game lobby.
+  rpc JoinGame(JoinGameRequest) returns (JoinGameResponse);
+
+  // Leave a game lobby.
+  rpc LeaveGame(LeaveGameRequest) returns (LeaveGameResponse);
+}

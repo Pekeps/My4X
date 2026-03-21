@@ -1,0 +1,35 @@
+syntax = "proto3";
+package game_proto;
+
+import "common.proto";
+
+// Actions a player can submit during their turn.
+
+message MoveAction {
+  uint32 unit_id = 1;
+  Position destination = 2;
+}
+
+message AttackAction {
+  uint32 attacker_id = 1;
+  uint32 defender_id = 2;
+}
+
+message BuildAction {
+  uint32 city_id = 1;
+  string template_key = 2;
+  Position target_tile = 3;
+}
+
+message EndTurnAction {
+  // No additional fields needed; the player context comes from the RPC.
+}
+
+message GameAction {
+  oneof action {
+    MoveAction move = 1;
+    AttackAction attack = 2;
+    BuildAction build = 3;
+    EndTurnAction end_turn = 4;
+  }
+}

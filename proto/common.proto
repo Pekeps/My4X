@@ -1,0 +1,17 @@
+syntax = "proto3";
+package game_proto;
+
+// Common types shared across service definitions.
+
+message Position {
+  int32 row = 1;
+  int32 col = 2;
+}
+
+message PlayerId {
+  string id = 1;
+}
+
+message GameId {
+  string id = 1;
+}
