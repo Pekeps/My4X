@@ -143,7 +143,26 @@ GameState GamePersistence::loadGame(const std::string &gameId) const {
     return deserializeGameState(data);
 }
 
+// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+
+/// Extract a TEXT column as std::string from a prepared statement.
+/// sqlite3_column_text returns const unsigned char*; the reinterpret_cast
+/// to const char* is unavoidable when working with the SQLite C API.
+static std::string columnString(sqlite3_stmt *stmt, int col) {
+    const auto *text = sqlite3_column_text(stmt, col);
+    if (text == nullptr) {
+        return {};
+    }
+    return {reinterpret_cast<const char *>(text)};
+}
+
+// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+
 std::vector<GameSummary> GamePersistence::listGames() const {
+    const char *sql = "SELECT id, name, turn, player_count, created_at, updated_at "
+                      "FROM games ORDER BY updated_at DESC;";
+    Statement stmt(db_, sql);
+
     static constexpr int COL_ID = 0;
     static constexpr int COL_NAME = 1;
     static constexpr int COL_TURN = 2;
@@ -152,41 +171,14 @@ std::vector<GameSummary> GamePersistence::listGames() const {
     static constexpr int COL_UPDATED_AT = 5;
 
     std::vector<GameSummary> results;
-
-    auto callback = [](void *data, int argc, char **argv, char ** /*colNames*/) -> int {
-        static constexpr int EXPECTED_COLS = 6;
-        auto *vec = static_cast<std::vector<GameSummary> *>(data);
-        if (argc < EXPECTED_COLS) {
-            return 0;
-        }
-        auto &summary = vec->emplace_back();
-        if (argv[COL_ID] != nullptr) {
-            summary.id = argv[COL_ID];
-        }
-        if (argv[COL_NAME] != nullptr) {
-            summary.name = argv[COL_NAME];
-        }
-        if (argv[COL_TURN] != nullptr) {
-            summary.turn = std::stoi(argv[COL_TURN]);
-        }
-        if (argv[COL_PLAYER_COUNT] != nullptr) {
-            summary.playerCount = std::stoi(argv[COL_PLAYER_COUNT]);
-        }
-        if (argv[COL_CREATED_AT] != nullptr) {
-            summary.createdAt = argv[COL_CREATED_AT];
-        }
-        if (argv[COL_UPDATED_AT] != nullptr) {
-            summary.updatedAt = argv[COL_UPDATED_AT];
-        }
-        return 0;
-    };
-
-    char *errMsg = nullptr;
-    const char *sql = "SELECT id, name, turn, player_count, created_at, updated_at "
-                      "FROM games ORDER BY updated_at DESC;";
-    sqlite3_exec(db_, sql, callback, &results, &errMsg);
-    if (errMsg != nullptr) {
-        sqlite3_free(errMsg);
+    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+        auto &summary = results.emplace_back();
+        summary.id = columnString(stmt.get(), COL_ID);
+        summary.name = columnString(stmt.get(), COL_NAME);
+        summary.turn = sqlite3_column_int(stmt.get(), COL_TURN);
+        summary.playerCount = sqlite3_column_int(stmt.get(), COL_PLAYER_COUNT);
+        summary.createdAt = columnString(stmt.get(), COL_CREATED_AT);
+        summary.updatedAt = columnString(stmt.get(), COL_UPDATED_AT);
     }
 
     return results;
