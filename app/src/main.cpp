@@ -52,8 +52,13 @@
 
 const int SCREEN_WIDTH = 1920;
 const int SCREEN_HEIGHT = 1080;
-const int MAP_ROWS = 30;
-const int MAP_COLS = 12;
+const int MAP_ROWS = 40;
+const int MAP_COLS = 24;
+
+// ── Debug mode ──────────────────────────────────────────────────────────────
+
+/// Set to true to disable fog of war and reveal the entire map.
+bool DEBUG_NO_FOG = false;
 
 // ── Top-left HUD ─────────────────────────────────────────────────────────────
 
@@ -128,32 +133,64 @@ const float DAMAGE_NUMBER_SPAWN_Y = 1.2F;
 // ── Demo setup ───────────────────────────────────────────────────────────────
 
 static void setupDemoState(game::GameState &state) {
-    // Register the player faction.
     auto &registry = state.mutableFactionRegistry();
-    game::FactionId playerId = registry.addFaction("Roman Empire", game::FactionType::Player, 0);
-
-    // Set city ownership to the player faction.
-    game::City capital("Ironhold", 5, 3, static_cast<int>(playerId));
-    capital.addTile(5, 4);
-    capital.addTile(4, 3);
-    state.addCity(std::move(capital));
-    state.addBuilding(game::makeFarm(5, 4));
-
-    // Set initial resources on the player faction's stockpile.
-    auto &playerFaction = registry.getMutableFaction(playerId);
-    playerFaction.addResources(game::Resource{.gold = 50, .production = 20, .food = 30});
-
-    // Also populate the legacy factionResources for backward compat.
-    state.factionResources() += game::Resource{.gold = 50, .production = 20, .food = 30};
-
-    // Add player units: a warrior and an archer.
     game::UnitTypeRegistry unitReg;
     unitReg.registerDefaults();
-    state.addUnit(std::make_unique<game::Warrior>(5, 5, unitReg, playerId));
-    state.addUnit(std::make_unique<game::Unit>(5, 6, unitReg.getTemplate("Archer"), playerId));
 
-    // Spawn neutral factions (hostile + passive) with units and diplomacy.
+    // ── Player faction: Roman Empire ─────────────────────────────────────
+    game::FactionId playerId = registry.addFaction("Roman Empire", game::FactionType::Player, 0);
+    auto &playerFaction = registry.getMutableFaction(playerId);
+    playerFaction.addResources(game::Resource{.gold = 100, .production = 40, .food = 60});
+    state.factionResources() += game::Resource{.gold = 100, .production = 40, .food = 60};
+
+    // Capital city with surrounding territory.
+    game::City capital("Roma", 10, 5, static_cast<int>(playerId));
+    capital.addTile(10, 6);
+    capital.addTile(9, 5);
+    capital.addTile(11, 5);
+    state.addCity(std::move(capital));
+    state.addBuilding(game::makeFarm(10, 6));
+    state.addBuilding(game::makeFarm(9, 5));
+
+    // Second city — frontier outpost.
+    game::City outpost("Mediolanum", 14, 8, static_cast<int>(playerId));
+    outpost.addTile(14, 9);
+    outpost.addTile(13, 8);
+    state.addCity(std::move(outpost));
+    state.addBuilding(game::makeFarm(14, 9));
+
+    // Player units — a garrison and a field army.
+    state.addUnit(std::make_unique<game::Warrior>(10, 4, unitReg, playerId));
+    state.addUnit(std::make_unique<game::Warrior>(11, 6, unitReg, playerId));
+    state.addUnit(std::make_unique<game::Unit>(10, 7, unitReg.getTemplate("Archer"), playerId));
+    state.addUnit(std::make_unique<game::Warrior>(14, 7, unitReg, playerId));
+    state.addUnit(std::make_unique<game::Unit>(13, 9, unitReg.getTemplate("Settler"), playerId));
+
+    // ── AI faction: Persian Empire ───────────────────────────────────────
+    game::FactionId persiaId = registry.addFaction("Persian Empire", game::FactionType::Player, 1);
+    auto &persiaFaction = registry.getMutableFaction(persiaId);
+    persiaFaction.addResources(game::Resource{.gold = 80, .production = 35, .food = 50});
+
+    game::City persepolis("Persepolis", 8, 18, static_cast<int>(persiaId));
+    persepolis.addTile(8, 19);
+    persepolis.addTile(7, 18);
+    state.addCity(std::move(persepolis));
+    state.addBuilding(game::makeFarm(8, 19));
+
+    game::City susa("Susa", 12, 20, static_cast<int>(persiaId));
+    susa.addTile(12, 21);
+    state.addCity(std::move(susa));
+
+    state.addUnit(std::make_unique<game::Warrior>(8, 17, unitReg, persiaId));
+    state.addUnit(std::make_unique<game::Warrior>(9, 19, unitReg, persiaId));
+    state.addUnit(std::make_unique<game::Unit>(7, 19, unitReg.getTemplate("Archer"), persiaId));
+    state.addUnit(std::make_unique<game::Warrior>(12, 19, unitReg, persiaId));
+
+    // ── Spawn neutral factions with units and diplomacy ──────────────────
     game::NeutralAI::spawnNeutralFactions(state);
+
+    // Initialize diplomacy between all factions.
+    state.mutableDiplomacy().initializeDefaults(registry);
 
     // Calculate initial fog of war for the player faction.
     state.recalculateFog(playerId);
@@ -1015,6 +1052,11 @@ static void handleInput(game::GameState &state, const std::optional<engine::hex:
         processTurn(state);
     }
 
+    // F1 toggles debug mode (disables fog of war).
+    if (IsKeyPressed(KEY_F1)) {
+        DEBUG_NO_FOG = !DEBUG_NO_FOG;
+    }
+
     // Combat log scrolling with Page Up / Page Down.
     if (IsKeyPressed(KEY_PAGE_UP)) {
         ++combatLogScroll;
@@ -1033,7 +1075,7 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
                             const std::vector<game::ReachableTile> &movementRange, const engine::Tooltip &tooltip,
                             const engine::EndTurnButton &endTurnBtn, const engine::UnitAnimator &animator) {
     BeginMode3D(cam);
-    const auto *fog = &state.fogOfWar();
+    const auto *fog = DEBUG_NO_FOG ? nullptr : &state.fogOfWar();
     engine::drawMap(state.map(), hoveredTile, fog, PLAYER_FACTION_ID);
 
     // Draw movement range overlay for selected unit.
@@ -1051,8 +1093,8 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
 
     engine::drawUnits(state.units(), state.factionRegistry(), models, selectedUnit, PLAYER_FACTION_ID,
                       &state.diplomacy(), fog, &animator);
-    engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy(),
-                       fog);
+    engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID,
+                       &state.diplomacy(), fog);
     engine::drawBuildings(state.buildings(), models, state.factionRegistry(), fog, PLAYER_FACTION_ID);
 
     // Draw 3D combat effects (hit flashes and death effects).
@@ -1087,7 +1129,7 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
     engine::drawCombatLogPanel(combatLog, SCREEN_WIDTH, SCREEN_HEIGHT, combatLogScroll);
 
     // Draw minimap overlay.
-    engine::minimap::draw(state.map(), &state.fogOfWar(), PLAYER_FACTION_ID, state.units(), state.cities(),
+    engine::minimap::draw(state.map(), fog, PLAYER_FACTION_ID, state.units(), state.cities(),
                           state.factionRegistry(), cam, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // Draw end-turn button.
@@ -1095,6 +1137,11 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
 
     // Draw tooltip (on top of everything).
     tooltip.draw(state, PLAYER_FACTION_ID);
+
+    // Debug mode indicator.
+    if (DEBUG_NO_FOG) {
+        DrawText("[DEBUG] Fog of War OFF (F1)", 14, SCREEN_HEIGHT - 30, 16, RED);
+    }
 }
 
 // ── All mutable game-loop state, bundled to keep main() simple ───────────────
