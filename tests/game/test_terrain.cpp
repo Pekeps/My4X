@@ -203,4 +203,32 @@ TEST(MapTest, TilesHaveCorrectCoordinates) {
         }
     }
 }
+
+// ── Tile elevation tests ──────────────────────────────────────────────────────
+
+TEST(TileTest, DefaultElevation) {
+    game::Tile plains(0, 0, game::TerrainType::Plains);
+    EXPECT_EQ(plains.elevation(), 0);
+}
+
+TEST(TileTest, SetAndGetElevation) {
+    game::Tile tile(0, 0, game::TerrainType::Plains);
+    tile.setElevation(3);
+    EXPECT_EQ(tile.elevation(), 3);
+}
+
+TEST(TileTest, MapGenerationSetsElevationFromTerrain) {
+    game::Map map(5, 5, 42);
+    for (int r = 0; r < map.height(); ++r) {
+        for (int c = 0; c < map.width(); ++c) {
+            const auto &t = map.tile(r, c);
+            if (t.terrainType() == game::TerrainType::Water) {
+                EXPECT_EQ(t.elevation(), 0);
+            } else if (t.terrainType() == game::TerrainType::Mountain) {
+                EXPECT_EQ(t.elevation(), 4);
+            }
+            EXPECT_GE(t.elevation(), 0);
+        }
+    }
+}
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

@@ -12,4 +12,8 @@ TerrainType Tile::terrainType() const { return terrain_; }
 
 void Tile::setTerrainType(TerrainType terrain) { terrain_ = terrain; }
 
+int Tile::elevation() const { return elevation_; }
+
+void Tile::setElevation(int elevation) { elevation_ = elevation; }
+
 } // namespace game
