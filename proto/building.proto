@@ -10,4 +10,7 @@ message Building {
   Resource yield_per_turn = 5;
   Resource construction_cost = 6;
   repeated TerrainType allowed_terrains = 7;
+  string model_key = 8;
+  uint32 faction_id = 9;
+  bool under_construction = 10;
 }

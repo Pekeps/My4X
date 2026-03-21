@@ -1015,7 +1015,7 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
                       &state.diplomacy(), fog);
     engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy(),
                        fog);
-    engine::drawBuildings(state.buildings(), fog, PLAYER_FACTION_ID);
+    engine::drawBuildings(state.buildings(), models, state.factionRegistry(), fog, PLAYER_FACTION_ID);
 
     // Draw 3D combat effects (hit flashes and death effects).
     effects.drawHitFlashes();
@@ -1182,6 +1182,9 @@ static void handleTransitionComplete(AppState &app) {
         app.modelManager.generateFallback("unit_warrior", engine::FallbackShape::Cube);
         app.modelManager.generateFallback("unit_archer", engine::FallbackShape::Cone);
         app.modelManager.generateFallback("unit_settler", engine::FallbackShape::Sphere);
+
+        // Register procedural fallback models for each building type.
+        engine::registerBuildingModels(app.modelManager);
 
         app.gameInitialized = true;
     }
