@@ -23,6 +23,7 @@ add_library(my4x_game STATIC
     src/FogOfWar.cpp
     src/CaptureAction.cpp
     src/MoveAction.cpp
+    src/GameSession.cpp
     src/MapGenerator.cpp
     src/Pathfinding.cpp
     src/ZoneOfControl.cpp

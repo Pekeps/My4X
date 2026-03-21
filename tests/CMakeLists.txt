@@ -38,6 +38,7 @@ add_executable(my4x_tests
     game/test_pathfinding.cpp
     game/test_movement_range.cpp
     game/test_zone_of_control.cpp
+    game/test_game_session.cpp
     game/test_hex_direction.cpp
     engine/test_animation_controller.cpp
     engine/test_audio_manager.cpp
