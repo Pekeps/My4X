@@ -84,4 +84,6 @@ MoveResult MoveAction::execute(GameState &state) const {
     return result;
 }
 
+std::size_t MoveAction::unitIndex() const { return unitIndex_; }
+
 } // namespace game

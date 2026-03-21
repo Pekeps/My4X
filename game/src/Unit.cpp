@@ -20,6 +20,11 @@ void Unit::moveTo(int row, int col, int cost) {
     movementRemaining_ -= cost;
 }
 
+void Unit::setPosition(int row, int col) {
+    row_ = row;
+    col_ = col;
+}
+
 int Unit::health() const { return health_; }
 int Unit::maxHealth() const { return template_.maxHealth; }
 bool Unit::isAlive() const { return health_ > 0; }

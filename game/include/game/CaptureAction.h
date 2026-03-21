@@ -70,6 +70,9 @@ class CaptureAction {
     /// Check whether a faction has been eliminated (no cities and no units).
     [[nodiscard]] static bool isFactionEliminated(const GameState &state, FactionId factionId);
 
+    /// Return the index of the capturing unit.
+    [[nodiscard]] std::size_t unitIndex() const;
+
   private:
     std::size_t unitIndex_;
 

@@ -40,6 +40,7 @@ add_executable(my4x_tests
     game/test_zone_of_control.cpp
     game/test_game_session.cpp
     game/test_reconnection_manager.cpp
+    game/test_prediction_manager.cpp
     game/test_turn_manager.cpp
     game/test_lobby_manager.cpp
     game/test_action_processor.cpp

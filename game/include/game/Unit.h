@@ -51,6 +51,10 @@ class Unit {
     /// cost from its remaining movement points.
     void moveTo(int row, int col, int cost);
 
+    /// Directly set this unit's position without deducting movement.
+    /// Used for state reconciliation / rollback (not regular game moves).
+    void setPosition(int row, int col);
+
     [[nodiscard]] int health() const;
     [[nodiscard]] int maxHealth() const;
     [[nodiscard]] bool isAlive() const;
