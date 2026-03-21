@@ -39,6 +39,7 @@ add_executable(my4x_tests
     game/test_movement_range.cpp
     game/test_zone_of_control.cpp
     game/test_game_session.cpp
+    game/test_reconnection_manager.cpp
     game/test_turn_manager.cpp
     game/test_lobby_manager.cpp
     game/test_hex_direction.cpp

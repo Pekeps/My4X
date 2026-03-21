@@ -29,6 +29,7 @@ add_library(my4x_game STATIC
     src/Pathfinding.cpp
     src/ZoneOfControl.cpp
     src/LobbyManager.cpp
+    src/ReconnectionManager.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
