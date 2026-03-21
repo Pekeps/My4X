@@ -35,7 +35,7 @@ std::array<Vector3, HEX_VERTEX_COUNT> hexVertices(Vector3 center) {
         float angle = (START_ANGLE_DEGREES + (static_cast<float>(i) * DEGREES_PER_SIDE)) * DEG_TO_RAD;
         verticies.at(i) = {
             .x = center.x + (HEX_RADIUS * cosf(angle)),
-            .y = 0.0F,
+            .y = center.y,
             .z = center.z + (HEX_RADIUS * sinf(angle)),
         };
     }
