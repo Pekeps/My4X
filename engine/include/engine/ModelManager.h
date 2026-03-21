@@ -3,11 +3,20 @@
 #include "raylib.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <unordered_map>
 
 namespace engine {
+
+/// Procedural shape types for fallback model generation.
+enum class FallbackShape : std::uint8_t {
+    Cube,     ///< Default cube shape.
+    Cone,     ///< Cone / pyramid shape (e.g., archers).
+    Sphere,   ///< Sphere shape (e.g., settlers).
+    Cylinder, ///< Cylinder shape (e.g., scouts).
+};
 
 /// Manages loading, caching, and lifetime of 3D models.
 ///
@@ -37,10 +46,14 @@ class ModelManager {
     /// If `key` already exists, returns true without reloading.
     bool loadModel(const std::string &key, const std::string &filePath);
 
-    /// Generate a procedural fallback model and store it under `key`.
+    /// Generate a procedural fallback model (cube) and store it under `key`.
     /// Useful for prototyping when no GLTF assets exist yet.
     /// If `key` already exists, does nothing and returns true.
     bool generateFallback(const std::string &key);
+
+    /// Generate a procedural fallback model of the given shape and store it
+    /// under `key`. If `key` already exists, does nothing and returns true.
+    bool generateFallback(const std::string &key, FallbackShape shape);
 
     /// Retrieve a loaded model by key.
     /// Returns a pointer to the Model, or nullptr if not found.

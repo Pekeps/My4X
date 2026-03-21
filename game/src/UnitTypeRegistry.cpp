@@ -74,6 +74,7 @@ void UnitTypeRegistry::registerDefaults() {
                          .attackRange = WARRIOR_ATTACK_RANGE,
                          .sightRange = WARRIOR_SIGHT_RANGE,
                          .productionCost = Resource{.gold = 0, .production = WARRIOR_PRODUCTION_COST, .food = 0},
+                         .modelKey = "unit_warrior",
                      });
 
     registerTemplate("Archer",
@@ -86,6 +87,7 @@ void UnitTypeRegistry::registerDefaults() {
                          .attackRange = ARCHER_ATTACK_RANGE,
                          .sightRange = ARCHER_SIGHT_RANGE,
                          .productionCost = Resource{.gold = 0, .production = ARCHER_PRODUCTION_COST, .food = 0},
+                         .modelKey = "unit_archer",
                      });
 
     registerTemplate("Settler",
@@ -98,6 +100,7 @@ void UnitTypeRegistry::registerDefaults() {
                          .attackRange = SETTLER_ATTACK_RANGE,
                          .sightRange = SETTLER_SIGHT_RANGE,
                          .productionCost = Resource{.gold = 0, .production = SETTLER_PRODUCTION_COST, .food = 0},
+                         .modelKey = "unit_settler",
                      });
 }
 

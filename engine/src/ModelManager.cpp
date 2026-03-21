@@ -11,6 +11,27 @@ namespace engine {
 /// Side length of the procedural fallback cube used when a model file is missing.
 static constexpr float FALLBACK_CUBE_SIZE = 1.0F;
 
+/// Radius for the procedural fallback cone mesh.
+static constexpr float FALLBACK_CONE_RADIUS = 0.5F;
+/// Height for the procedural fallback cone mesh.
+static constexpr float FALLBACK_CONE_HEIGHT = 1.0F;
+/// Number of slices for the procedural fallback cone mesh.
+static constexpr int FALLBACK_CONE_SLICES = 8;
+
+/// Radius for the procedural fallback sphere mesh.
+static constexpr float FALLBACK_SPHERE_RADIUS = 0.5F;
+/// Number of rings for the procedural fallback sphere mesh.
+static constexpr int FALLBACK_SPHERE_RINGS = 8;
+/// Number of slices for the procedural fallback sphere mesh.
+static constexpr int FALLBACK_SPHERE_SLICES = 8;
+
+/// Radius for the procedural fallback cylinder mesh.
+static constexpr float FALLBACK_CYLINDER_RADIUS = 0.3F;
+/// Height for the procedural fallback cylinder mesh.
+static constexpr float FALLBACK_CYLINDER_HEIGHT = 1.0F;
+/// Number of slices for the procedural fallback cylinder mesh.
+static constexpr int FALLBACK_CYLINDER_SLICES = 8;
+
 // ── Destructor ──────────────────────────────────────────────────────────────
 
 ModelManager::~ModelManager() { unloadAll(); }
@@ -61,17 +82,41 @@ bool ModelManager::loadModel(const std::string &key, const std::string &filePath
 
 // ── generateFallback ────────────────────────────────────────────────────────
 
-bool ModelManager::generateFallback(const std::string &key) {
+bool ModelManager::generateFallback(const std::string &key) { return generateFallback(key, FallbackShape::Cube); }
+
+bool ModelManager::generateFallback(const std::string &key, FallbackShape shape) {
     if (models_.contains(key)) {
         return true;
     }
 
-    Mesh mesh = GenMeshCube(FALLBACK_CUBE_SIZE, FALLBACK_CUBE_SIZE, FALLBACK_CUBE_SIZE);
+    Mesh mesh{};
+    const char *shapeName = "cube";
+
+    switch (shape) {
+    case FallbackShape::Cone:
+        mesh = GenMeshCone(FALLBACK_CONE_RADIUS, FALLBACK_CONE_HEIGHT, FALLBACK_CONE_SLICES);
+        shapeName = "cone";
+        break;
+    case FallbackShape::Sphere:
+        mesh = GenMeshSphere(FALLBACK_SPHERE_RADIUS, FALLBACK_SPHERE_RINGS, FALLBACK_SPHERE_SLICES);
+        shapeName = "sphere";
+        break;
+    case FallbackShape::Cylinder:
+        mesh = GenMeshCylinder(FALLBACK_CYLINDER_RADIUS, FALLBACK_CYLINDER_HEIGHT, FALLBACK_CYLINDER_SLICES);
+        shapeName = "cylinder";
+        break;
+    case FallbackShape::Cube:
+    default:
+        mesh = GenMeshCube(FALLBACK_CUBE_SIZE, FALLBACK_CUBE_SIZE, FALLBACK_CUBE_SIZE);
+        shapeName = "cube";
+        break;
+    }
+
     Model model = LoadModelFromMesh(mesh);
     models_.emplace(key, model);
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-    TraceLog(LOG_INFO, "ModelManager: generated fallback cube for key '%s'", key.c_str());
+    TraceLog(LOG_INFO, "ModelManager: generated fallback %s for key '%s'", // NOLINT(cppcoreguidelines-pro-type-vararg)
+             shapeName, key.c_str());
     return true;
 }
 

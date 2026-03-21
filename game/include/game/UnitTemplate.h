@@ -27,6 +27,10 @@ struct UnitTemplate {
 
     /// Resource cost to produce this unit in a city build queue.
     Resource productionCost;
+
+    /// Key used to look up this unit type's 3D model in ModelManager.
+    /// When empty, the renderer falls back to a generic placeholder.
+    std::string modelKey;
 };
 
 } // namespace game

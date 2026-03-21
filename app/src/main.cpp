@@ -13,6 +13,7 @@
 #include "engine/MapRenderer.h"
 #include "engine/MenuSystem.h"
 #include "engine/Minimap.h"
+#include "engine/ModelManager.h"
 #include "engine/RangeOverlay.h"
 #include "engine/Tooltip.h"
 #include "engine/Transition.h"
@@ -980,8 +981,8 @@ static void handleInput(game::GameState &state, const std::optional<engine::hex:
 
 static void renderGameFrame(const game::GameState &state, Camera3D cam,
                             const std::optional<engine::hex::TileCoord> &hoveredTile, int selectedUnit,
-                            std::optional<game::CityId> selectedCity, engine::CombatEffectManager &effects,
-                            const game::CombatLog &combatLog, int combatLogScroll,
+                            std::optional<game::CityId> selectedCity, const engine::ModelManager &models,
+                            engine::CombatEffectManager &effects, const game::CombatLog &combatLog, int combatLogScroll,
                             const std::vector<game::ReachableTile> &movementRange, const engine::Tooltip &tooltip,
                             const engine::EndTurnButton &endTurnBtn) {
     BeginMode3D(cam);
@@ -1001,7 +1002,8 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
         }
     }
 
-    engine::drawUnits(state.units(), state.factionRegistry(), selectedUnit, PLAYER_FACTION_ID, &state.diplomacy(), fog);
+    engine::drawUnits(state.units(), state.factionRegistry(), models, selectedUnit, PLAYER_FACTION_ID,
+                      &state.diplomacy(), fog);
     engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy(),
                        fog);
     engine::drawBuildings(state.buildings(), fog, PLAYER_FACTION_ID);
@@ -1064,6 +1066,7 @@ struct AppState {
     int selectedUnit = NO_SELECTION;
     std::optional<game::CityId> selectedCity;
 
+    engine::ModelManager modelManager;
     engine::CombatEffectManager combatEffects;
     game::CombatLog combatLog;
     int combatLogScroll = 0;
@@ -1136,8 +1139,9 @@ static void updateInGame(AppState &app, float dt) {
         }
     }
 
-    renderGameFrame(app.state, cam, hoveredTile, app.selectedUnit, app.selectedCity, app.combatEffects, app.combatLog,
-                    app.combatLogScroll, app.movementRange, app.tooltip, app.endTurnBtn);
+    renderGameFrame(app.state, cam, hoveredTile, app.selectedUnit, app.selectedCity, app.modelManager,
+                    app.combatEffects, app.combatLog, app.combatLogScroll, app.movementRange, app.tooltip,
+                    app.endTurnBtn);
 }
 
 static void handleTransitionComplete(AppState &app) {
@@ -1145,6 +1149,12 @@ static void handleTransitionComplete(AppState &app) {
     app.transition.start(engine::TransitionDir::FadeIn);
     if (app.currentScreen == engine::Screen::InGame && !app.gameInitialized) {
         setupDemoState(app.state);
+
+        // Register procedural fallback models for each unit type.
+        app.modelManager.generateFallback("unit_warrior", engine::FallbackShape::Cube);
+        app.modelManager.generateFallback("unit_archer", engine::FallbackShape::Cone);
+        app.modelManager.generateFallback("unit_settler", engine::FallbackShape::Sphere);
+
         app.gameInitialized = true;
     }
 }
