@@ -25,6 +25,7 @@ add_library(my4x_game STATIC
     src/MoveAction.cpp
     src/GameSession.cpp
     src/TurnManager.cpp
+    src/ActionProcessor.cpp
     src/MapGenerator.cpp
     src/Pathfinding.cpp
     src/ZoneOfControl.cpp
