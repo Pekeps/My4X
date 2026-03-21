@@ -103,11 +103,20 @@ std::string templateKeyFromProtoType(game_proto::UnitType type) {
 }
 
 BuildingFactory buildingFactoryByName(const std::string &name) {
+    if (name == "City Center") {
+        return makeCityCenter;
+    }
     if (name == "Farm") {
         return makeFarm;
     }
     if (name == "Mine") {
         return makeMine;
+    }
+    if (name == "Lumber Mill") {
+        return makeLumberMill;
+    }
+    if (name == "Barracks") {
+        return makeBarracks;
     }
     if (name == "Market") {
         return makeMarket;
@@ -189,6 +198,9 @@ std::string serializeGameState(const GameState &state) {
         for (TerrainType terrain : building.allowedTerrains()) {
             protoBuilding->add_allowed_terrains(toProtoTerrain(terrain));
         }
+        protoBuilding->set_model_key(building.modelKey());
+        protoBuilding->set_faction_id(static_cast<uint32_t>(building.factionId()));
+        protoBuilding->set_under_construction(building.underConstruction());
     }
 
     // Units
@@ -277,7 +289,7 @@ GameState deserializeGameState(const std::string &data) {
     }
     state.setNextCityId(proto.next_city_id());
 
-    // Buildings (restore with original IDs and allowed terrains)
+    // Buildings (restore with original IDs, allowed terrains, and model/faction info)
     for (const game_proto::Building &protoBuilding : proto.buildings()) {
         std::set<TileCoord> tiles;
         for (int i = 0; i < protoBuilding.tile_rows_size(); ++i) {
@@ -289,8 +301,10 @@ GameState deserializeGameState(const std::string &data) {
         }
         Resource yieldPerTurn = fromProto(protoBuilding.yield_per_turn());
         Resource constructionCost = fromProto(protoBuilding.construction_cost());
+        auto factionId = static_cast<FactionId>(protoBuilding.faction_id());
         Building building(protoBuilding.name(), yieldPerTurn, constructionCost, std::move(tiles),
-                          std::move(allowedTerrains));
+                          std::move(allowedTerrains), protoBuilding.model_key(), factionId,
+                          protoBuilding.under_construction());
         building.setId(protoBuilding.id());
         state.restoreBuilding(std::move(building));
     }

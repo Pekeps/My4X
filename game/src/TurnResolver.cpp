@@ -126,7 +126,9 @@ void spawnCompletedUnit(GameState &state, const City &city, const UnitSpawnReque
 void handleCompletedProduction(GameState &state, const City &city, BuildQueueResult &result,
                                const UnitTypeRegistry *unitRegistry) {
     if (std::holds_alternative<Building>(result)) {
-        state.addBuilding(std::move(std::get<Building>(result)));
+        auto &building = std::get<Building>(result);
+        building.setFactionId(static_cast<FactionId>(city.factionId()));
+        state.addBuilding(std::move(building));
     } else if (unitRegistry != nullptr) {
         spawnCompletedUnit(state, city, std::get<UnitSpawnRequest>(result), *unitRegistry);
     }
