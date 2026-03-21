@@ -13,10 +13,14 @@ class Tile {
     [[nodiscard]] TerrainType terrainType() const;
     void setTerrainType(TerrainType terrain);
 
+    [[nodiscard]] int elevation() const;
+    void setElevation(int elevation);
+
   private:
     int row_;
     int col_;
     TerrainType terrain_;
+    int elevation_{0};
 };
 
 } // namespace game
