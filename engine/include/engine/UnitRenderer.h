@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/ModelManager.h"
+#include "engine/UnitAnimator.h"
 #include "game/DiplomacyManager.h"
 #include "game/FactionRegistry.h"
 #include "game/FogOfWar.h"
@@ -18,8 +19,10 @@ namespace engine {
 // playerFactionId: the human player's faction ID, used to draw diplomacy rings.
 // diplomacy: if provided, draws colored rings to indicate diplomatic relation to the player.
 // fog: if provided, enemy units on non-Visible tiles are hidden.
+// animator: if provided, uses animated visual positions and scales instead of tile positions.
 void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game::FactionRegistry &factions,
                const ModelManager &models, int selectedIndex = -1, game::FactionId playerFactionId = 0,
-               const game::DiplomacyManager *diplomacy = nullptr, const game::FogOfWar *fog = nullptr);
+               const game::DiplomacyManager *diplomacy = nullptr, const game::FogOfWar *fog = nullptr,
+               const UnitAnimator *animator = nullptr);
 
 } // namespace engine
