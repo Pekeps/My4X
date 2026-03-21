@@ -64,6 +64,15 @@ std::size_t GameSession::playerCount() const { return players_.size(); }
 
 bool GameSession::hasPlayer(PlayerId playerId) const { return players_.contains(playerId); }
 
+std::vector<PlayerId> GameSession::playerIds() const {
+    std::vector<PlayerId> ids;
+    ids.reserve(players_.size());
+    for (const auto &[id, info] : players_) {
+        ids.push_back(id);
+    }
+    return ids;
+}
+
 // -- Action processing ---------------------------------------------------
 
 bool GameSession::unitBelongsToPlayer(PlayerId playerId, std::size_t unitIndex) const {
