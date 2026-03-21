@@ -38,6 +38,16 @@ jobs:
           path: C:/vcpkg/installed
           key: vcpkg-windows-protobuf-grpc-${{ hashFiles('.github/workflows/ci.yml') }}
 
+      - name: Free disk space (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Remove-Item -Recurse -Force "C:\Program Files\dotnet\sdk" -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "C:\Program Files\dotnet\shared" -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "C:\Program Files (x86)\Microsoft SDKs\Azure" -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "C:\hostedtoolcache\CodeQL" -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "C:\hostedtoolcache\Java_Temurin-Hotspot_jdk" -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "C:\hostedtoolcache\PyPy" -ErrorAction SilentlyContinue
+
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: vcpkg install protobuf grpc
