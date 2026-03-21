@@ -12,7 +12,7 @@ enum class HexEdgeType : std::uint8_t {
 };
 
 /// Classify the edge type between two elevations.
-[[nodiscard]] inline constexpr HexEdgeType classifyEdge(int elevationA, int elevationB) {
+[[nodiscard]] constexpr HexEdgeType classifyEdge(int elevationA, int elevationB) {
     int diff = (elevationA > elevationB) ? (elevationA - elevationB) : (elevationB - elevationA);
     if (diff == 0) {
         return HexEdgeType::Flat;

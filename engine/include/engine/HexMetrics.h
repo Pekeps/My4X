@@ -6,13 +6,13 @@ namespace engine::hex_metrics {
 static constexpr float HEX_RADIUS = 1.0F;
 
 /// Fraction of the hex radius that remains solid-colored (no blending).
-static constexpr float SOLID_FACTOR = 0.8F;
+static constexpr float SOLID_FACTOR = 0.75F;
 
 /// Fraction of the hex radius used for blend regions.
 static constexpr float BLEND_FACTOR = 1.0F - SOLID_FACTOR;
 
 /// World-space height per elevation level.
-static constexpr float ELEVATION_STEP = 0.3F;
+static constexpr float ELEVATION_STEP = 0.15F;
 
 /// Number of terrace steps between two elevation levels.
 static constexpr int TERRACE_STEPS = 2;

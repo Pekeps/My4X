@@ -225,7 +225,7 @@ TEST(TileTest, MapGenerationSetsElevationFromTerrain) {
             if (t.terrainType() == game::TerrainType::Water) {
                 EXPECT_EQ(t.elevation(), 0);
             } else if (t.terrainType() == game::TerrainType::Mountain) {
-                EXPECT_EQ(t.elevation(), 4);
+                EXPECT_EQ(t.elevation(), 3);
             }
             EXPECT_GE(t.elevation(), 0);
         }

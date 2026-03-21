@@ -1,12 +1,11 @@
 #include "engine/MapRenderer.h"
 
-#include "HexDraw.h"
 #include "engine/EdgeVertices.h"
+#include "engine/HexEdgeType.h"
 #include "engine/HexGrid.h"
 #include "engine/HexMeshBuilder.h"
 #include "engine/HexMetrics.h"
 #include "engine/TerrainColors.h"
-#include "engine/TerrainHeight.h"
 #include "game/HexDirection.h"
 
 #include "raylib.h"
@@ -17,334 +16,333 @@
 
 namespace engine {
 
-/// Color used to render unexplored (never-seen) tiles.
-static constexpr Color FOG_UNEXPLORED_COLOR = {.r = 10, .g = 10, .b = 15, .a = 255};
+// ── Constants ────────────────────────────────────────────────────────────────
 
-/// Semi-transparent dark overlay drawn on explored-but-not-visible tiles
-/// to dim them to roughly 50% brightness.
-static constexpr Color FOG_EXPLORED_OVERLAY = {.r = 0, .g = 0, .b = 0, .a = 128};
-
-/// Outline color for unexplored tiles (slightly lighter than fill for shape).
-static constexpr Color FOG_UNEXPLORED_OUTLINE = {.r = 20, .g = 20, .b = 30, .a = 255};
-
-/// Dim a color by blending it toward black (simulates the explored overlay).
-/// factor 0 = full black, 1 = original color.
-static constexpr float EXPLORED_DIM_FACTOR = 0.5F;
-
-/// Half height used for trunk cylinder positioning.
-static constexpr float TRUNK_HALF_DIVISOR = 2.0F;
-
-/// Starting angle for hex corner computation (degrees).
-static constexpr float HEX_START_ANGLE = 30.0F;
-
-/// Degrees between consecutive hex vertices.
-static constexpr float HEX_DEGREES_PER_SIDE = 60.0F;
-
-/// Conversion factor from degrees to radians.
 static constexpr float DEG_TO_RAD = std::numbers::pi_v<float> / 180.0F;
-
-/// Number of hex sides / vertices.
 static constexpr int HEX_SIDES = 6;
-
-/// Number of "near" edge directions processed for blending (NE, E, SE).
 static constexpr int NEAR_DIRECTION_COUNT = 3;
 
-/// Color blend factor for corner triangles: average of 3 colors uses 1/3 weight.
-static constexpr float CORNER_BLEND_THIRD = 1.0F / 3.0F;
+/// Maps HexDirection index to the two corner vertex indices forming that edge.
+static constexpr std::array<std::array<int, 2>, HEX_SIDES> DIRECTION_EDGE = {{
+    {4, 5}, // NE
+    {5, 0}, // E
+    {0, 1}, // SE
+    {1, 2}, // SW
+    {2, 3}, // W
+    {3, 4}, // NW
+}};
 
-/// Color blend factor for corner triangles: 2/3 weight.
-static constexpr float CORNER_BLEND_TWO_THIRDS = 2.0F / 3.0F;
+/// Corner offset vectors from hex center at FULL radius (HEX_RADIUS = 1.0).
+/// Cached on first call.
+static const std::array<Vector3, HEX_SIDES> &cornerOffsets() {
+    static constexpr float START = 30.0F;
+    static constexpr float STEP = 60.0F;
+    static const auto offsets = []() {
+        std::array<Vector3, HEX_SIDES> o{};
+        for (int i = 0; i < HEX_SIDES; ++i) {
+            float angle = (START + (static_cast<float>(i) * STEP)) * DEG_TO_RAD;
+            o.at(i) = {
+                .x = hex_metrics::HEX_RADIUS * cosf(angle), .y = 0.0F, .z = hex_metrics::HEX_RADIUS * sinf(angle)};
+        }
+        return o;
+    }();
+    return offsets;
+}
 
-static Color dimColor(Color base) {
-    return Color{
-        .r = static_cast<unsigned char>(static_cast<float>(base.r) * EXPLORED_DIM_FACTOR),
-        .g = static_cast<unsigned char>(static_cast<float>(base.g) * EXPLORED_DIM_FACTOR),
-        .b = static_cast<unsigned char>(static_cast<float>(base.b) * EXPLORED_DIM_FACTOR),
-        .a = base.a,
+/// Get first solid corner for direction d: corners[DIRECTION_EDGE[d][0]] * solidFactor
+static Vector3 getFirstSolidCorner(int dirIdx) {
+    const auto &c = cornerOffsets();
+    int idx = DIRECTION_EDGE.at(dirIdx).at(0);
+    return {.x = c.at(idx).x * hex_metrics::SOLID_FACTOR, .y = 0.0F, .z = c.at(idx).z * hex_metrics::SOLID_FACTOR};
+}
+
+/// Get second solid corner for direction d: corners[DIRECTION_EDGE[d][1]] * solidFactor
+static Vector3 getSecondSolidCorner(int dirIdx) {
+    const auto &c = cornerOffsets();
+    int idx = DIRECTION_EDGE.at(dirIdx).at(1);
+    return {.x = c.at(idx).x * hex_metrics::SOLID_FACTOR, .y = 0.0F, .z = c.at(idx).z * hex_metrics::SOLID_FACTOR};
+}
+
+/// Bridge vector for direction d: (corners[left] + corners[right]) * blendFactor
+static Vector3 getBridge(int dirIdx) {
+    const auto &c = cornerOffsets();
+    int left = DIRECTION_EDGE.at(dirIdx).at(0);
+    int right = DIRECTION_EDGE.at(dirIdx).at(1);
+    return {
+        .x = (c.at(left).x + c.at(right).x) * hex_metrics::BLEND_FACTOR,
+        .y = 0.0F,
+        .z = (c.at(left).z + c.at(right).z) * hex_metrics::BLEND_FACTOR,
     };
 }
 
-/// Compute hex corners at a given radius around a center point.
-static std::array<Vector3, HEX_SIDES> hexCornersAtRadius(Vector3 center, float radius) {
-    std::array<Vector3, HEX_SIDES> corners{};
-    for (int i = 0; i < HEX_SIDES; ++i) {
-        float angle = (HEX_START_ANGLE + (static_cast<float>(i) * HEX_DEGREES_PER_SIDE)) * DEG_TO_RAD;
-        corners.at(i) = {
-            .x = center.x + (radius * cosf(angle)),
-            .y = center.y,
-            .z = center.z + (radius * sinf(angle)),
-        };
-    }
-    return corners;
+static float elevationY(const game::Map &map, int r, int c) {
+    return static_cast<float>(map.tile(r, c).elevation()) * hex_metrics::ELEVATION_STEP;
 }
 
-/// Check if a neighbor in a given direction is visible (not unexplored).
-static bool isNeighborVisible(const game::Map &map, int row, int col, game::HexDirection dir, const game::FogOfWar *fog,
-                              game::FactionId playerId) {
-    auto neighbor = game::neighborCoord(row, col, dir, map.height(), map.width());
-    if (!neighbor) {
-        return false;
-    }
-    auto [nr, nc] = *neighbor;
-    if (fog == nullptr) {
-        return true;
-    }
-    return fog->getVisibility(playerId, nr, nc) != game::VisibilityState::Unexplored;
+static Color getCellColor(const game::Map &map, int row, int col) {
+    return terrain_colors::terrainFillColor(map.tile(row, col).terrainType());
 }
 
-/// Get the terrain fill color of a neighbor cell. Returns ownColor for
-/// out-of-bounds or unexplored neighbors.
-static Color getNeighborColor(const game::Map &map, int row, int col, game::HexDirection dir, Color ownColor,
-                              const game::FogOfWar *fog, game::FactionId playerId, game::VisibilityState ownVis) {
-    auto neighbor = game::neighborCoord(row, col, dir, map.height(), map.width());
-    if (!neighbor) {
-        return ownColor;
-    }
-    auto [nr, nc] = *neighbor;
-    if (fog != nullptr && fog->getVisibility(playerId, nr, nc) == game::VisibilityState::Unexplored) {
-        return ownColor;
-    }
-    Color nColor = terrain_colors::terrainFillColor(map.tile(nr, nc).terrainType());
-    // If current cell is explored (dimmed), dim the neighbor color too for consistency.
-    if (ownVis == game::VisibilityState::Explored) {
-        nColor = dimColor(nColor);
-    }
-    return nColor;
+// ── Terrace interpolation (Part 3) ───────────────────────────────────────────
+
+static Vector3 terraceLerp(Vector3 a, Vector3 b, int step) {
+    float h = static_cast<float>(step) * hex_metrics::HORIZONTAL_TERRACE_STEP;
+    Vector3 result = {
+        .x = a.x + ((b.x - a.x) * h),
+        .y = a.y, // set below
+        .z = a.z + ((b.z - a.z) * h),
+    };
+    int vStep = (step + 1) / 2; // NOLINT(bugprone-integer-division)
+    float v = static_cast<float>(vStep) * hex_metrics::VERTICAL_TERRACE_STEP;
+    result.y = a.y + ((b.y - a.y) * v);
+    return result;
 }
 
-/// Compute blended corner color from this cell and its two adjacent neighbors.
-static Color cornerBlendColor(const game::Map &map, int row, int col, int dirIdx, Color cellColor,
-                              const game::FogOfWar *fog, game::FactionId playerId, game::VisibilityState vis) {
+static Color terraceLerpColor(Color a, Color b, int step) {
+    float h = static_cast<float>(step) * hex_metrics::HORIZONTAL_TERRACE_STEP;
+    return lerpColor(a, b, h);
+}
+
+/// Edge terraces between two cells (slope connection).
+static void triangulateEdgeTerraces(HexMeshBuilder &builder, Vector3 beginLeft, Vector3 beginRight, Color beginColor,
+                                    Vector3 endLeft, Vector3 endRight, Color endColor) {
+    Vector3 v3 = terraceLerp(beginLeft, endLeft, 1);
+    Vector3 v4 = terraceLerp(beginRight, endRight, 1);
+    Color c2 = terraceLerpColor(beginColor, endColor, 1);
+
+    builder.addQuad(beginLeft, beginRight, v4, v3, beginColor, beginColor, c2, c2);
+
+    for (int i = 2; i < hex_metrics::TERRACE_INTERPOLATION_STEPS; ++i) {
+        Vector3 v1 = v3;
+        Vector3 v2 = v4;
+        Color c1 = c2;
+        v3 = terraceLerp(beginLeft, endLeft, i);
+        v4 = terraceLerp(beginRight, endRight, i);
+        c2 = terraceLerpColor(beginColor, endColor, i);
+        builder.addQuad(v1, v2, v4, v3, c1, c1, c2, c2);
+    }
+
+    builder.addQuad(v3, v4, endRight, endLeft, c2, c2, endColor, endColor);
+}
+
+// ── Corner triangulation (Part 3 — all cases) ───────────────────────────────
+// NOLINTBEGIN(readability-suspicious-call-argument)
+
+static void triangulateCornerTerraces(HexMeshBuilder &builder, Vector3 begin, Color beginColor, Vector3 left,
+                                      Color leftColor, Vector3 right, Color rightColor) {
+    Vector3 v3 = terraceLerp(begin, left, 1);
+    Vector3 v4 = terraceLerp(begin, right, 1);
+    Color c3 = terraceLerpColor(beginColor, leftColor, 1);
+    Color c4 = terraceLerpColor(beginColor, rightColor, 1);
+
+    builder.addTriangle(begin, v3, v4, beginColor, c3, c4);
+
+    for (int i = 2; i < hex_metrics::TERRACE_INTERPOLATION_STEPS; ++i) {
+        Vector3 v1 = v3;
+        Vector3 v2 = v4;
+        Color c1 = c3;
+        Color c2 = c4;
+        v3 = terraceLerp(begin, left, i);
+        v4 = terraceLerp(begin, right, i);
+        c3 = terraceLerpColor(beginColor, leftColor, i);
+        c4 = terraceLerpColor(beginColor, rightColor, i);
+        builder.addQuad(v1, v2, v4, v3, c1, c2, c4, c3);
+    }
+
+    builder.addQuad(v3, v4, right, left, c3, c4, rightColor, leftColor);
+}
+
+static void triangulateBoundaryTriangle(HexMeshBuilder &builder, Vector3 begin, Color beginColor, Vector3 left,
+                                        Color leftColor, Vector3 boundary, Color boundaryColor) {
+    Vector3 v2 = terraceLerp(begin, left, 1);
+    Color c2 = terraceLerpColor(beginColor, leftColor, 1);
+
+    builder.addTriangle(begin, v2, boundary, beginColor, c2, boundaryColor);
+
+    for (int i = 2; i < hex_metrics::TERRACE_INTERPOLATION_STEPS; ++i) {
+        Vector3 v1 = v2;
+        Color c1 = c2;
+        v2 = terraceLerp(begin, left, i);
+        c2 = terraceLerpColor(beginColor, leftColor, i);
+        builder.addTriangle(v1, v2, boundary, c1, c2, boundaryColor);
+    }
+
+    builder.addTriangle(v2, left, boundary, c2, leftColor, boundaryColor);
+}
+
+static void triangulateCornerTerracesCliff(HexMeshBuilder &builder, Vector3 begin, Color beginColor, int beginElev,
+                                           Vector3 left, Color leftColor, int leftElev, Vector3 right, Color rightColor,
+                                           int rightElev) {
+    float b = 1.0F / static_cast<float>(rightElev - beginElev);
+    if (b < 0.0F) {
+        b = -b;
+    }
+    Vector3 boundary = lerpVector3(begin, right, b);
+    Color boundaryColor = lerpColor(beginColor, rightColor, b);
+
+    triangulateBoundaryTriangle(builder, begin, beginColor, left, leftColor, boundary, boundaryColor);
+
+    if (classifyEdge(leftElev, rightElev) == HexEdgeType::Slope) {
+        triangulateBoundaryTriangle(builder, left, leftColor, right, rightColor, boundary, boundaryColor);
+    } else {
+        builder.addTriangle(left, right, boundary, leftColor, rightColor, boundaryColor);
+    }
+}
+
+static void triangulateCornerCliffTerraces(HexMeshBuilder &builder, Vector3 begin, Color beginColor, int beginElev,
+                                           Vector3 left, Color leftColor, int leftElev, Vector3 right, Color rightColor,
+                                           int rightElev) {
+    float b = 1.0F / static_cast<float>(leftElev - beginElev);
+    if (b < 0.0F) {
+        b = -b;
+    }
+    Vector3 boundary = lerpVector3(begin, left, b);
+    Color boundaryColor = lerpColor(beginColor, leftColor, b);
+
+    triangulateBoundaryTriangle(builder, right, rightColor, begin, beginColor, boundary, boundaryColor);
+
+    if (classifyEdge(leftElev, rightElev) == HexEdgeType::Slope) {
+        triangulateBoundaryTriangle(builder, left, leftColor, right, rightColor, boundary, boundaryColor);
+    } else {
+        builder.addTriangle(left, right, boundary, leftColor, rightColor, boundaryColor);
+    }
+}
+
+static void triangulateCorner(HexMeshBuilder &builder, Vector3 bottom, Color bottomColor, int bottomElev, Vector3 left,
+                              Color leftColor, int leftElev, Vector3 right, Color rightColor, int rightElev) {
+    auto leftEdgeType = classifyEdge(bottomElev, leftElev);
+    auto rightEdgeType = classifyEdge(bottomElev, rightElev);
+
+    if (leftEdgeType == HexEdgeType::Slope) {
+        if (rightEdgeType == HexEdgeType::Slope) {
+            triangulateCornerTerraces(builder, bottom, bottomColor, left, leftColor, right, rightColor);
+        } else if (rightEdgeType == HexEdgeType::Flat) {
+            triangulateCornerTerraces(builder, left, leftColor, right, rightColor, bottom, bottomColor);
+        } else {
+            triangulateCornerTerracesCliff(builder, bottom, bottomColor, bottomElev, left, leftColor, leftElev, right,
+                                           rightColor, rightElev);
+        }
+    } else if (rightEdgeType == HexEdgeType::Slope) {
+        if (leftEdgeType == HexEdgeType::Flat) {
+            triangulateCornerTerraces(builder, right, rightColor, bottom, bottomColor, left, leftColor);
+        } else {
+            triangulateCornerCliffTerraces(builder, bottom, bottomColor, bottomElev, left, leftColor, leftElev, right,
+                                           rightColor, rightElev);
+        }
+    } else if (classifyEdge(leftElev, rightElev) == HexEdgeType::Slope) {
+        if (leftElev < rightElev) {
+            triangulateCornerCliffTerraces(builder, right, rightColor, rightElev, bottom, bottomColor, bottomElev, left,
+                                           leftColor, leftElev);
+        } else {
+            triangulateCornerTerracesCliff(builder, left, leftColor, leftElev, right, rightColor, rightElev, bottom,
+                                           bottomColor, bottomElev);
+        }
+    } else {
+        builder.addTriangle(bottom, left, right, bottomColor, leftColor, rightColor);
+    }
+}
+
+// NOLINTEND(readability-suspicious-call-argument)
+
+// ── Connection logic (Part 2 + Part 3) ───────────────────────────────────────
+
+/// Build the bridge quad and corner triangle for one direction.
+/// Called only for NE, E, SE (d=0,1,2).
+// NOLINTBEGIN(readability-suspicious-call-argument)
+static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map, int row, int col, int dirIdx,
+                                  Vector3 v1, Vector3 v2, Color cellColor, int cellElev) {
     auto dir = game::ALL_DIRECTIONS.at(dirIdx);
+    auto neighborOpt = game::neighborCoord(row, col, dir, map.height(), map.width());
+    if (!neighborOpt) {
+        return;
+    }
+    auto [nr, nc] = *neighborOpt;
+    Color neighborColor = getCellColor(map, nr, nc);
+    int neighborElev = map.tile(nr, nc).elevation();
+
+    // Bridge quad: v3 = v1 + bridge, v4 = v2 + bridge, with neighbor's Y.
+    Vector3 bridge = getBridge(dirIdx);
+    Vector3 v3 = {.x = v1.x + bridge.x, .y = elevationY(map, nr, nc), .z = v1.z + bridge.z};
+    Vector3 v4 = {.x = v2.x + bridge.x, .y = elevationY(map, nr, nc), .z = v2.z + bridge.z};
+
+    auto edgeType = classifyEdge(cellElev, neighborElev);
+    if (edgeType == HexEdgeType::Slope) {
+        triangulateEdgeTerraces(builder, v1, v2, cellColor, v3, v4, neighborColor);
+    } else {
+        builder.addQuad(v1, v2, v4, v3, cellColor, cellColor, neighborColor, neighborColor);
+    }
+
+    // Corner triangle: only for NE (d=0) and E (d=1).
     int nextD = (dirIdx + 1) % HEX_SIDES;
     auto nextDir = game::ALL_DIRECTIONS.at(nextD);
+    auto nextNeighborOpt = game::neighborCoord(row, col, nextDir, map.height(), map.width());
+    if (dirIdx <= 1 && nextNeighborOpt) {
+        auto [nnr, nnc] = *nextNeighborOpt;
+        Color nextNeighborColor = getCellColor(map, nnr, nnc);
+        int nextNeighborElev = map.tile(nnr, nnc).elevation();
 
-    Color color1 = getNeighborColor(map, row, col, dir, cellColor, fog, playerId, vis);
-    Color color2 = getNeighborColor(map, row, col, nextDir, cellColor, fog, playerId, vis);
+        // v5 = v2 + bridge(nextDirection), with next neighbor's Y.
+        Vector3 nextBridge = getBridge(nextD);
+        Vector3 v5 = {.x = v2.x + nextBridge.x, .y = elevationY(map, nnr, nnc), .z = v2.z + nextBridge.z};
 
-    return lerpColor(cellColor, lerpColor(color1, color2, CORNER_BLEND_THIRD), CORNER_BLEND_TWO_THIRDS);
-}
-
-/// Add the inner solid hex (6 triangles from center to inner corners).
-static void addInnerHex(HexMeshBuilder &builder, Vector3 center, const std::array<Vector3, HEX_SIDES> &innerCorners,
-                        Color cellColor) {
-    for (int i = 0; i < HEX_SIDES; ++i) {
-        int next = (i + 1) % HEX_SIDES;
-        builder.addTriangle(center, innerCorners.at(next), innerCorners.at(i), cellColor);
-    }
-}
-
-/// Add edge blend quads for the first 3 directions (NE, E, SE).
-static void addNearEdges(HexMeshBuilder &builder, const game::Map &map, int row, int col,
-                         const std::array<Vector3, HEX_SIDES> &innerCorners,
-                         const std::array<Vector3, HEX_SIDES> &outerCorners, Color cellColor, const game::FogOfWar *fog,
-                         game::FactionId playerId, game::VisibilityState vis) {
-    for (int d = 0; d < NEAR_DIRECTION_COUNT; ++d) {
-        auto dir = game::ALL_DIRECTIONS.at(d);
-        int vi = d;
-        int vn = (d + 1) % HEX_SIDES;
-
-        Color neighborColor = getNeighborColor(map, row, col, dir, cellColor, fog, playerId, vis);
-
-        builder.addQuad(innerCorners.at(vi), innerCorners.at(vn), outerCorners.at(vn), outerCorners.at(vi), cellColor,
-                        cellColor, neighborColor, neighborColor);
-    }
-}
-
-/// Add edge blend quads for the last 3 directions (SW, W, NW) where no
-/// visible neighbor exists to handle the opposite side.
-static void addFarEdges(HexMeshBuilder &builder, const game::Map &map, int row, int col,
-                        const std::array<Vector3, HEX_SIDES> &innerCorners,
-                        const std::array<Vector3, HEX_SIDES> &outerCorners, Color cellColor, const game::FogOfWar *fog,
-                        game::FactionId playerId) {
-    for (int d = NEAR_DIRECTION_COUNT; d < HEX_SIDES; ++d) {
-        auto dir = game::ALL_DIRECTIONS.at(d);
-        bool hasVisibleNeighbor = isNeighborVisible(map, row, col, dir, fog, playerId);
-
-        if (!hasVisibleNeighbor) {
-            int vi = d;
-            int vn = (d + 1) % HEX_SIDES;
-            builder.addQuad(innerCorners.at(vi), innerCorners.at(vn), outerCorners.at(vn), outerCorners.at(vi),
-                            cellColor, cellColor, cellColor, cellColor);
+        // Determine bottom cell and dispatch.
+        if (cellElev <= neighborElev) {
+            if (cellElev <= nextNeighborElev) {
+                triangulateCorner(builder, v2, cellColor, cellElev, v4, neighborColor, neighborElev, v5,
+                                  nextNeighborColor, nextNeighborElev);
+            } else {
+                triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, v2, cellColor, cellElev, v4,
+                                  neighborColor, neighborElev);
+            }
+        } else if (neighborElev <= nextNeighborElev) {
+            triangulateCorner(builder, v4, neighborColor, neighborElev, v5, nextNeighborColor, nextNeighborElev, v2,
+                              cellColor, cellElev);
+        } else {
+            triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, v2, cellColor, cellElev, v4,
+                              neighborColor, neighborElev);
         }
     }
 }
 
-/// Add corner blend triangles for the first 3 directions (NE, E, SE).
-static void addNearCorners(HexMeshBuilder &builder, const game::Map &map, int row, int col,
-                           const std::array<Vector3, HEX_SIDES> &innerCorners,
-                           const std::array<Vector3, HEX_SIDES> &outerCorners, Color cellColor,
-                           const game::FogOfWar *fog, game::FactionId playerId, game::VisibilityState vis) {
-    for (int d = 0; d < NEAR_DIRECTION_COUNT; ++d) {
-        int cornerIdx = (d + 1) % HEX_SIDES;
-        Color blended = cornerBlendColor(map, row, col, d, cellColor, fog, playerId, vis);
-        builder.addTriangle(innerCorners.at(cornerIdx), outerCorners.at(cornerIdx), outerCorners.at(cornerIdx),
-                            blended);
-    }
-}
+// NOLINTEND(readability-suspicious-call-argument)
 
-/// Add corner blend triangles for the last 3 directions (SW, W, NW) where
-/// at least one adjacent neighbor is missing or unexplored.
-static void addFarCorners(HexMeshBuilder &builder, const game::Map &map, int row, int col,
-                          const std::array<Vector3, HEX_SIDES> &innerCorners,
-                          const std::array<Vector3, HEX_SIDES> &outerCorners, Color cellColor,
-                          const game::FogOfWar *fog, game::FactionId playerId, game::VisibilityState vis) {
-    for (int d = NEAR_DIRECTION_COUNT; d < HEX_SIDES; ++d) {
-        auto dir = game::ALL_DIRECTIONS.at(d);
-        int nextD = (d + 1) % HEX_SIDES;
-        auto nextDir = game::ALL_DIRECTIONS.at(nextD);
+// ── Per-cell triangulation ───────────────────────────────────────────────────
 
-        bool n1Visible = isNeighborVisible(map, row, col, dir, fog, playerId);
-        bool n2Visible = isNeighborVisible(map, row, col, nextDir, fog, playerId);
+static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int row, int col) {
+    Vector3 center = hex::tileCenter(row, col);
+    center.y = elevationY(map, row, col);
+    Color cellColor = getCellColor(map, row, col);
+    int cellElev = map.tile(row, col).elevation();
 
-        if (!n1Visible || !n2Visible) {
-            int cornerIdx = (d + 1) % HEX_SIDES;
-            Color blended = cornerBlendColor(map, row, col, d, cellColor, fog, playerId, vis);
-            builder.addTriangle(innerCorners.at(cornerIdx), outerCorners.at(cornerIdx), outerCorners.at(cornerIdx),
-                                blended);
+    for (int d = 0; d < HEX_SIDES; ++d) {
+        // Solid inner triangle: center → v1 → v2
+        Vector3 sc1 = getFirstSolidCorner(d);
+        Vector3 sc2 = getSecondSolidCorner(d);
+        Vector3 v1 = {.x = center.x + sc1.x, .y = center.y, .z = center.z + sc1.z};
+        Vector3 v2 = {.x = center.x + sc2.x, .y = center.y, .z = center.z + sc2.z};
+
+        builder.addTriangle(center, v1, v2, cellColor);
+
+        // Edge and corner connections (only NE, E, SE)
+        if (d < NEAR_DIRECTION_COUNT) {
+            triangulateConnection(builder, map, row, col, d, v1, v2, cellColor, cellElev);
         }
     }
 }
 
-/// Draw small cone/sphere "trees" on a forest hex tile.
-static void drawForestTrees(Vector3 center) {
-    namespace th = terrain_height;
-    for (int i = 0; i < th::FOREST_TREE_COUNT; ++i) {
-        float angle = (th::TREE_ANGLE_START + (static_cast<float>(i) * th::TREE_ANGLE_STEP)) * th::DEG_TO_RAD_FACTOR;
-        float treeX = center.x + (th::TREE_RING_RADIUS * cosf(angle));
-        float treeZ = center.z + (th::TREE_RING_RADIUS * sinf(angle));
+// ── Main draw function ───────────────────────────────────────────────────────
 
-        // Trunk: small brown cylinder
-        Vector3 trunkBase = {.x = treeX, .y = center.y, .z = treeZ};
-        Vector3 trunkTop = {.x = treeX, .y = center.y + th::TREE_TRUNK_HEIGHT, .z = treeZ};
-        DrawCylinderEx(trunkBase, trunkTop, th::TREE_TRUNK_RADIUS, th::TREE_TRUNK_RADIUS, th::CYLINDER_SLICES,
-                       th::TREE_TRUNK_COLOR);
-
-        // Canopy: green cone on top of trunk
-        Vector3 canopyBase = trunkTop;
-        Vector3 canopyTip = {.x = treeX, .y = center.y + th::TREE_TRUNK_HEIGHT + th::TREE_CANOPY_HEIGHT, .z = treeZ};
-        DrawCylinderEx(canopyBase, canopyTip, th::TREE_CANOPY_RADIUS, 0.0F, th::CONE_SLICES, th::TREE_CANOPY_COLOR);
-    }
-}
-
-/// Draw a tall gray-white peak on a mountain hex tile.
-static void drawMountainPeak(Vector3 center) {
-    namespace th = terrain_height;
-    // Main rocky peak cone
-    Vector3 peakBase = {.x = center.x, .y = center.y, .z = center.z};
-    Vector3 peakTop = {.x = center.x, .y = center.y + th::MOUNTAIN_PEAK_HEIGHT, .z = center.z};
-    DrawCylinderEx(peakBase, peakTop, th::MOUNTAIN_PEAK_RADIUS, 0.0F, th::CONE_SLICES, th::MOUNTAIN_PEAK_COLOR);
-
-    // Snow cap: smaller white cone on top
-    Vector3 snowBase = {.x = center.x, .y = center.y + th::MOUNTAIN_PEAK_HEIGHT - th::SNOW_CAP_HEIGHT, .z = center.z};
-    DrawCylinderEx(snowBase, peakTop, th::SNOW_CAP_RADIUS, 0.0F, th::CONE_SLICES, th::MOUNTAIN_SNOW_COLOR);
-}
-
-/// Draw a rounded bump on a hills hex tile.
-static void drawHillsBump(Vector3 center) {
-    namespace th = terrain_height;
-    DrawSphere(center, th::HILLS_BUMP_RADIUS, terrain_colors::HILLS_FILL);
-}
-
-/// Draw 3D terrain decorations on a visible tile.
-static void drawDecorations(Vector3 center, game::TerrainType terrain) {
-    switch (terrain) {
-    case game::TerrainType::Forest:
-        drawForestTrees(center);
-        break;
-    case game::TerrainType::Mountain:
-        drawMountainPeak(center);
-        break;
-    case game::TerrainType::Hills:
-        drawHillsBump(center);
-        break;
-    default:
-        break;
-    }
-}
-
-/// Draw outlines, highlights, and decorations for a single visible/explored tile.
-static void drawTileOverlays(Vector3 center, game::TerrainType terrain, game::VisibilityState vis,
-                             std::optional<hex::TileCoord> highlightedTile, int row, int col) {
-    Color outlineColor = terrain_colors::terrainOutlineColor(terrain);
-    if (vis == game::VisibilityState::Explored) {
-        outlineColor = dimColor(outlineColor);
-    }
-
-    // Highlight hovered tile on top of terrain fill (only on visible tiles).
-    if (vis == game::VisibilityState::Visible && highlightedTile && highlightedTile->row == row &&
-        highlightedTile->col == col) {
-        drawFilledHex3D(center, YELLOW);
-    }
-
-    drawHex3D(center, outlineColor);
-
-    if (vis == game::VisibilityState::Visible) {
-        drawDecorations(center, terrain);
-    }
-}
-
-void drawMap(const game::Map &map, std::optional<hex::TileCoord> highlightedTile, const game::FogOfWar *fog,
-             game::FactionId playerFactionId) {
+void drawMap(const game::Map &map, std::optional<hex::TileCoord> /*highlightedTile*/, const game::FogOfWar * /*fog*/,
+             game::FactionId /*playerFactionId*/) {
     HexMeshBuilder builder;
 
-    float innerRadius = hex_metrics::SOLID_FACTOR * hex_metrics::HEX_RADIUS;
-
-    // ── Pass 1: Build blended terrain mesh ──────────────────────────────────
     for (int row = 0; row < map.height(); ++row) {
         for (int col = 0; col < map.width(); ++col) {
-            auto vis = game::VisibilityState::Visible;
-            if (fog != nullptr) {
-                vis = fog->getVisibility(playerFactionId, row, col);
-            }
-            if (vis == game::VisibilityState::Unexplored) {
-                continue;
-            }
-
-            Vector3 center = hex::tileCenter(row, col);
-            game::TerrainType terrain = map.tile(row, col).terrainType();
-            center.y += terrain_height::terrainHeight(terrain);
-
-            Color cellColor = terrain_colors::terrainFillColor(terrain);
-            if (vis == game::VisibilityState::Explored) {
-                cellColor = dimColor(cellColor);
-            }
-
-            auto innerCorners = hexCornersAtRadius(center, innerRadius);
-            auto outerCorners = hexCornersAtRadius(center, hex_metrics::HEX_RADIUS);
-
-            addInnerHex(builder, center, innerCorners, cellColor);
-            addNearEdges(builder, map, row, col, innerCorners, outerCorners, cellColor, fog, playerFactionId, vis);
-            addFarEdges(builder, map, row, col, innerCorners, outerCorners, cellColor, fog, playerFactionId);
-            addNearCorners(builder, map, row, col, innerCorners, outerCorners, cellColor, fog, playerFactionId, vis);
-            addFarCorners(builder, map, row, col, innerCorners, outerCorners, cellColor, fog, playerFactionId, vis);
+            triangulateCell(builder, map, row, col);
         }
     }
 
     builder.flush();
-
-    // ── Pass 2: Overlays, outlines, highlights, and decorations ─────────────
-    for (int row = 0; row < map.height(); ++row) {
-        for (int col = 0; col < map.width(); ++col) {
-            Vector3 center = hex::tileCenter(row, col);
-
-            auto vis = game::VisibilityState::Visible;
-            if (fog != nullptr) {
-                vis = fog->getVisibility(playerFactionId, row, col);
-            }
-
-            if (vis == game::VisibilityState::Unexplored) {
-                drawFilledHex3D(center, FOG_UNEXPLORED_COLOR);
-                drawHex3D(center, FOG_UNEXPLORED_OUTLINE);
-                continue;
-            }
-
-            game::TerrainType terrain = map.tile(row, col).terrainType();
-            center.y += terrain_height::terrainHeight(terrain);
-
-            drawTileOverlays(center, terrain, vis, highlightedTile, row, col);
-        }
-    }
 }
 
 } // namespace engine
