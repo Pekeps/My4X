@@ -10,4 +10,4 @@ Checks: >
     -bugprone-easily-swappable-parameters
 
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*/(engine|game)/include/.*'
+HeaderFilterRegex: '.*/(engine|game|network)/include/.*'

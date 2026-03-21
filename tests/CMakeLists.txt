@@ -58,3 +58,20 @@ if(MSVC)
 else()
     target_compile_options(my4x_tests PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+# ── Network tests (only when gRPC is available) ─────────────────────────────
+if(TARGET my4x_network)
+    add_executable(my4x_network_tests
+        network/test_network_client.cpp
+    )
+
+    target_link_libraries(my4x_network_tests PRIVATE my4x_network GTest::gtest_main)
+
+    gtest_discover_tests(my4x_network_tests)
+
+    if(MSVC)
+        target_compile_options(my4x_network_tests PRIVATE /W4)
+    else()
+        target_compile_options(my4x_network_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endif()

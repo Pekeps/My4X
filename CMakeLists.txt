@@ -36,6 +36,7 @@ add_subdirectory(engine)
 add_subdirectory(proto)
 add_subdirectory(game)
 add_subdirectory(server)
+add_subdirectory(network)
 add_subdirectory(app)
 
 option(BUILD_TESTING "Build tests" ON)
