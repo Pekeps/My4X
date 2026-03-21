@@ -32,10 +32,11 @@ add_library(my4x_game STATIC
     src/LobbyManager.cpp
     src/ReconnectionManager.cpp
     src/PredictionManager.cpp
+    src/GamePersistence.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
-target_link_libraries(my4x_game PUBLIC my4x_proto)
+target_link_libraries(my4x_game PUBLIC my4x_proto sqlite3)
 
 if(MSVC)
     target_compile_options(my4x_game PRIVATE /W4)

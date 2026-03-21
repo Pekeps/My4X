@@ -30,6 +30,32 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 
+# SQLite3 — prefer system-installed library, fall back to amalgamation.
+find_package(SQLite3 QUIET)
+if(NOT SQLite3_FOUND)
+    message(STATUS "System SQLite3 not found — fetching amalgamation")
+    if(EXISTS "${_DEPS_CACHE}/sqlite-src/sqlite3.c" AND NOT FETCHCONTENT_SOURCE_DIR_SQLITE)
+        set(FETCHCONTENT_SOURCE_DIR_SQLITE "${_DEPS_CACHE}/sqlite-src")
+    endif()
+    FetchContent_Declare(
+        sqlite
+        URL https://www.sqlite.org/2024/sqlite-amalgamation-3460100.zip
+    )
+    FetchContent_MakeAvailable(sqlite)
+    add_library(sqlite3 STATIC ${sqlite_SOURCE_DIR}/sqlite3.c)
+    target_include_directories(sqlite3 PUBLIC ${sqlite_SOURCE_DIR})
+    set_target_properties(sqlite3 PROPERTIES C_STANDARD 11)
+    if(NOT MSVC)
+        target_compile_options(sqlite3 PRIVATE -w)
+    endif()
+else()
+    message(STATUS "Using system SQLite3 ${SQLite3_VERSION}")
+    # Create an alias so downstream can link to "sqlite3" uniformly.
+    if(NOT TARGET sqlite3)
+        add_library(sqlite3 ALIAS SQLite::SQLite3)
+    endif()
+endif()
+
 FetchContent_MakeAvailable(raylib)
 
 add_subdirectory(engine)
