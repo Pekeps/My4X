@@ -1,7 +1,7 @@
 BUILD_DIR := build
 BUILD_TYPE ?= Debug
 JOBS ?= $(shell nproc)
-SOURCES := $(shell find engine game app server -name '*.cpp' -o -name '*.h')
+SOURCES := $(shell find engine game network app server -name '*.cpp' -o -name '*.h')
 CMAKE_FLAGS := -B $(BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
 
 .PHONY: build test lint format format-check clean configure ci
