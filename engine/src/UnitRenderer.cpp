@@ -6,6 +6,7 @@
 #include "engine/FactionColors.h"
 #include "engine/HexGrid.h"
 #include "engine/ModelManager.h"
+#include "engine/UnitAnimator.h"
 
 #include "raylib.h"
 #include "raymath.h"
@@ -42,32 +43,56 @@ static constexpr float FALLBACK_Y_SCALE = 0.2F;
 static const float FALLBACK_Y_OFFSET = FALLBACK_CYLINDER_HEIGHT * FALLBACK_Y_SCALE;
 static constexpr int FALLBACK_CYLINDER_SLICES = 8;
 
-/// Draw the unit's 3D model (or fallback cylinder) at its tile position.
-static void drawUnitModel(const game::Unit &unit, const ModelManager &models, Color fillColor, Color wireColor) {
-    Vector3 center = hex::tileCenter(unit.row(), unit.col());
+/// Resolve the world-space center for a unit, using the animator's visual
+/// position when available, otherwise falling back to the logical tile center.
+static Vector3 resolveUnitCenter(const game::Unit &unit, std::size_t index, const UnitAnimator *animator) {
+    if (animator != nullptr) {
+        auto animPos = animator->getVisualPosition(static_cast<UnitId>(index));
+        if (animPos.has_value()) {
+            return {animPos->x, animPos->y, animPos->z};
+        }
+    }
+    return hex::tileCenter(unit.row(), unit.col());
+}
 
+/// Resolve the visual scale for a unit, using the animator when available.
+static float resolveUnitScale(std::size_t index, const UnitAnimator *animator) {
+    if (animator != nullptr) {
+        auto animScale = animator->getVisualScale(static_cast<UnitId>(index));
+        if (animScale.has_value()) {
+            return *animScale;
+        }
+    }
+    return DEFAULT_VISUAL_SCALE;
+}
+
+/// Draw the unit's 3D model (or fallback cylinder) at the given position and scale.
+static void drawUnitModel(const game::Unit &unit, const ModelManager &models, Color fillColor, Color wireColor,
+                          Vector3 center, float visualScale) {
     const auto &modelKey = unit.unitTemplate().modelKey;
     const Model *mdl = modelKey.empty() ? nullptr : models.getModel(modelKey);
 
+    float effectiveModelScale = MODEL_SCALE * visualScale;
+
     if (mdl != nullptr) {
         Vector3 modelPos = center;
-        modelPos.y = MODEL_Y_OFFSET;
-        DrawModel(*mdl, modelPos, MODEL_SCALE, fillColor);
-        DrawModelWires(*mdl, modelPos, MODEL_SCALE, wireColor);
+        modelPos.y = MODEL_Y_OFFSET + center.y;
+        DrawModel(*mdl, modelPos, effectiveModelScale, fillColor);
+        DrawModelWires(*mdl, modelPos, effectiveModelScale, wireColor);
     } else {
-        center.y = FALLBACK_Y_OFFSET;
-        DrawCylinder(center, FALLBACK_CYLINDER_RADIUS, FALLBACK_CYLINDER_RADIUS, FALLBACK_CYLINDER_HEIGHT,
-                     FALLBACK_CYLINDER_SLICES, fillColor);
-        DrawCylinderWires(center, FALLBACK_CYLINDER_RADIUS, FALLBACK_CYLINDER_RADIUS, FALLBACK_CYLINDER_HEIGHT,
-                          FALLBACK_CYLINDER_SLICES, wireColor);
+        Vector3 cylPos = center;
+        cylPos.y = FALLBACK_Y_OFFSET + center.y;
+        float scaledRadius = FALLBACK_CYLINDER_RADIUS * visualScale;
+        float scaledHeight = FALLBACK_CYLINDER_HEIGHT * visualScale;
+        DrawCylinder(cylPos, scaledRadius, scaledRadius, scaledHeight, FALLBACK_CYLINDER_SLICES, fillColor);
+        DrawCylinderWires(cylPos, scaledRadius, scaledRadius, scaledHeight, FALLBACK_CYLINDER_SLICES, wireColor);
     }
 }
 
-/// Draw level pips and level-up indicator for a unit.
-static void drawLevelIndicators(const game::Unit &unit) {
+/// Draw level pips and level-up indicator for a unit at the given position.
+static void drawLevelIndicators(const game::Unit &unit, Vector3 basePos) {
     int unitLevel = unit.level();
     if (unitLevel > 0) {
-        Vector3 basePos = hex::tileCenter(unit.row(), unit.col());
         float totalWidth = static_cast<float>(unitLevel - 1) * LEVEL_PIP_SPREAD;
         float startX = basePos.x - (totalWidth / PIP_CENTER_DIVISOR);
         for (int pip = 0; pip < unitLevel; ++pip) {
@@ -77,7 +102,7 @@ static void drawLevelIndicators(const game::Unit &unit) {
     }
 
     if (unit.justLeveledUp()) {
-        Vector3 starPos = hex::tileCenter(unit.row(), unit.col());
+        Vector3 starPos = basePos;
         starPos.y = LEVEL_STAR_Y_OFFSET;
         DrawSphere(starPos, LEVEL_STAR_RADIUS, GOLD);
     }
@@ -97,7 +122,7 @@ static void resolveFactionColors(const game::Unit &unit, const game::FactionRegi
 
 void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game::FactionRegistry &factions,
                const ModelManager &models, int selectedIndex, game::FactionId playerFactionId,
-               const game::DiplomacyManager *diplomacy, const game::FogOfWar *fog) {
+               const game::DiplomacyManager *diplomacy, const game::FogOfWar *fog, const UnitAnimator *animator) {
     for (std::size_t i = 0; i < units.size(); ++i) {
         const auto &unit = units.at(i);
         if (!unit->isAlive()) {
@@ -116,11 +141,15 @@ void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game
         Color wireColor{};
         resolveFactionColors(*unit, factions, fillColor, wireColor);
 
-        drawUnitModel(*unit, models, fillColor, wireColor);
+        Vector3 center = resolveUnitCenter(*unit, i, animator);
+        float visualScale = resolveUnitScale(i, animator);
+
+        drawUnitModel(*unit, models, fillColor, wireColor, center, visualScale);
 
         // Draw selection ring on the ground under the selected unit.
         if (std::cmp_equal(i, selectedIndex)) {
-            Vector3 ringPos = hex::tileCenter(unit->row(), unit->col());
+            Vector3 ringPos = center;
+            ringPos.y = 0.0F; // Ring always on the ground.
             DrawCylinder(ringPos, RING_RADIUS, RING_RADIUS, RING_HEIGHT, RING_SLICES, YELLOW);
         }
 
@@ -128,12 +157,13 @@ void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game
         if (diplomacy != nullptr && unit->factionId() != playerFactionId) {
             auto relation = diplomacy->getRelation(playerFactionId, unit->factionId());
             Color dipColor = diplomacy_colors::diplomacyColor(relation);
-            Vector3 ringPos = hex::tileCenter(unit->row(), unit->col());
+            Vector3 ringPos = center;
+            ringPos.y = 0.0F; // Ring always on the ground.
             DrawCylinder(ringPos, diplomacy_colors::DIPLOMACY_RING_RADIUS, diplomacy_colors::DIPLOMACY_RING_RADIUS,
                          diplomacy_colors::DIPLOMACY_RING_HEIGHT, diplomacy_colors::DIPLOMACY_RING_SLICES, dipColor);
         }
 
-        drawLevelIndicators(*unit);
+        drawLevelIndicators(*unit, center);
     }
 }
 

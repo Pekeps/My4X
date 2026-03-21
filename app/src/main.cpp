@@ -18,6 +18,7 @@
 #include "engine/RangeOverlay.h"
 #include "engine/Tooltip.h"
 #include "engine/Transition.h"
+#include "engine/UnitAnimator.h"
 #include "engine/UnitRenderer.h"
 #include "engine/Window.h"
 #include "game/AttackAction.h"
@@ -729,7 +730,8 @@ static int findUnitAtTile(const game::GameState &state, int row, int col) {
 /// Returns true if an attack was successfully executed.
 static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit, int clickedUnit,
                       engine::CombatEffectManager &effects, game::CombatLog &combatLog,
-                      engine::CameraCinematic &cinematic, const engine::Camera &camera) {
+                      engine::CameraCinematic &cinematic, const engine::Camera &camera,
+                      engine::UnitAnimator &animator) {
     auto &units = state.units();
     auto &sel = units[selectedUnit];
     auto &target = units[clickedUnit];
@@ -799,6 +801,25 @@ static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile
 
     cinematic.triggerCombat(defCenter, camera.snapshot());
 
+    // ── Trigger unit animations ─────────────────────────────────────────
+
+    // Attack lunge animation on the attacker.
+    Vector3 atkAnimPos = engine::hex::tileCenter(attackerRow, attackerCol);
+    Vector3 defAnimPos = engine::hex::tileCenter(defenderRow, defenderCol);
+    animator.startAttack(static_cast<engine::UnitId>(selectedUnit),
+                         {.x = atkAnimPos.x, .y = atkAnimPos.y, .z = atkAnimPos.z},
+                         {.x = defAnimPos.x, .y = defAnimPos.y, .z = defAnimPos.z});
+
+    // Death animations for killed units.
+    if (result.combat.defenderDied) {
+        animator.startDeath(static_cast<engine::UnitId>(clickedUnit),
+                            {.x = defAnimPos.x, .y = defAnimPos.y, .z = defAnimPos.z});
+    }
+    if (result.combat.attackerDied) {
+        animator.startDeath(static_cast<engine::UnitId>(selectedUnit),
+                            {.x = atkAnimPos.x, .y = atkAnimPos.y, .z = atkAnimPos.z});
+    }
+
     // ── Log combat event ─────────────────────────────────────────────────
 
     game::CombatEvent event;
@@ -838,12 +859,24 @@ static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile
 /// Try to move the selected unit to the clicked tile (adjacent, empty).
 /// Returns true if movement occurred.
 static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &tile, int selectedUnit,
-                        game::CombatLog &combatLog) {
+                        game::CombatLog &combatLog, engine::UnitAnimator &animator) {
+    // Capture the unit's current tile position *before* the move executes.
+    const auto &unit = state.units().at(selectedUnit);
+    int fromRow = unit->row();
+    int fromCol = unit->col();
+
     game::MoveAction action(static_cast<std::size_t>(selectedUnit), tile.row, tile.col);
     auto result = action.execute(state);
     if (!result.executed) {
         return false;
     }
+
+    // Start the movement animation from the old tile to the new tile.
+    Vector3 fromCenter = engine::hex::tileCenter(fromRow, fromCol);
+    Vector3 toCenter = engine::hex::tileCenter(tile.row, tile.col);
+    animator.startMove(static_cast<engine::UnitId>(selectedUnit),
+                       {.x = fromCenter.x, .y = fromCenter.y, .z = fromCenter.z},
+                       {.x = toCenter.x, .y = toCenter.y, .z = toCenter.z});
 
     // Recalculate fog of war after unit movement.
     state.recalculateFog(PLAYER_FACTION_ID);
@@ -882,7 +915,8 @@ static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &ti
 /// Returns true if the click was consumed.
 static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit,
                                     int clickedUnit, engine::CombatEffectManager &effects, game::CombatLog &combatLog,
-                                    engine::CameraCinematic &cinematic, const engine::Camera &camera) {
+                                    engine::CameraCinematic &cinematic, const engine::Camera &camera,
+                                    engine::UnitAnimator &animator) {
     auto &units = state.units();
     auto &sel = units[selectedUnit];
 
@@ -898,7 +932,7 @@ static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::T
 
     // Click on another unit — try attack or switch selection.
     if (clickedUnit != NO_SELECTION && clickedUnit != selectedUnit) {
-        if (tryAttack(state, tile, selectedUnit, clickedUnit, effects, combatLog, cinematic, camera)) {
+        if (tryAttack(state, tile, selectedUnit, clickedUnit, effects, combatLog, cinematic, camera, animator)) {
             return true;
         }
         // Click on a friendly unit — select it instead.
@@ -910,7 +944,7 @@ static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::T
     }
 
     // Click on empty tile — try to move.
-    if (clickedUnit == NO_SELECTION && tryMoveUnit(state, tile, selectedUnit, combatLog)) {
+    if (clickedUnit == NO_SELECTION && tryMoveUnit(state, tile, selectedUnit, combatLog, animator)) {
         return true;
     }
 
@@ -927,7 +961,8 @@ static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::T
 /// Returns true if the click was consumed by unit logic.
 static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit,
                             engine::CombatEffectManager &effects, game::CombatLog &combatLog,
-                            engine::CameraCinematic &cinematic, const engine::Camera &camera) {
+                            engine::CameraCinematic &cinematic, const engine::Camera &camera,
+                            engine::UnitAnimator &animator) {
     int clickedUnit = findUnitAtTile(state, tile.row, tile.col);
 
     if (selectedUnit != NO_SELECTION) {
@@ -936,7 +971,8 @@ static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord
             selectedUnit = NO_SELECTION;
             return false;
         }
-        return handleSelectedUnitClick(state, tile, selectedUnit, clickedUnit, effects, combatLog, cinematic, camera);
+        return handleSelectedUnitClick(state, tile, selectedUnit, clickedUnit, effects, combatLog, cinematic, camera,
+                                       animator);
     }
 
     // No unit selected — try to select one.
@@ -953,12 +989,14 @@ static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord
 static void handleInput(game::GameState &state, const std::optional<engine::hex::TileCoord> &hoveredTile,
                         int &selectedUnit, std::optional<game::CityId> &selectedCity,
                         engine::CombatEffectManager &effects, game::CombatLog &combatLog, int &combatLogScroll,
-                        engine::CameraCinematic &cinematic, const engine::Camera &camera) {
+                        engine::CameraCinematic &cinematic, const engine::Camera &camera,
+                        engine::UnitAnimator &animator) {
     // Clean up any dead units and adjust selected unit index accordingly.
     state.removeDeadUnits(&selectedUnit);
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hoveredTile) {
-        bool unitHandled = handleUnitClick(state, *hoveredTile, selectedUnit, effects, combatLog, cinematic, camera);
+        bool unitHandled =
+            handleUnitClick(state, *hoveredTile, selectedUnit, effects, combatLog, cinematic, camera, animator);
         if (!unitHandled) {
             handleCityClick(state.cities(), *hoveredTile, selectedCity);
         }
@@ -993,7 +1031,7 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
                             std::optional<game::CityId> selectedCity, const engine::ModelManager &models,
                             engine::CombatEffectManager &effects, const game::CombatLog &combatLog, int combatLogScroll,
                             const std::vector<game::ReachableTile> &movementRange, const engine::Tooltip &tooltip,
-                            const engine::EndTurnButton &endTurnBtn) {
+                            const engine::EndTurnButton &endTurnBtn, const engine::UnitAnimator &animator) {
     BeginMode3D(cam);
     const auto *fog = &state.fogOfWar();
     engine::drawMap(state.map(), hoveredTile, fog, PLAYER_FACTION_ID);
@@ -1012,7 +1050,7 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
     }
 
     engine::drawUnits(state.units(), state.factionRegistry(), models, selectedUnit, PLAYER_FACTION_ID,
-                      &state.diplomacy(), fog);
+                      &state.diplomacy(), fog, &animator);
     engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy(),
                        fog);
     engine::drawBuildings(state.buildings(), models, state.factionRegistry(), fog, PLAYER_FACTION_ID);
@@ -1078,6 +1116,7 @@ struct AppState {
     engine::ModelManager modelManager;
     engine::CombatEffectManager combatEffects;
     engine::CameraCinematic cinematic;
+    engine::UnitAnimator unitAnimator;
     game::CombatLog combatLog;
     int combatLogScroll = 0;
 
@@ -1141,6 +1180,8 @@ static void updateInGame(AppState &app, float dt) {
     auto hoveredTile = engine::input::mouseToTile(cam, MAP_ROWS, MAP_COLS);
 
     app.combatEffects.update(dt);
+    app.unitAnimator.update(dt);
+    app.unitAnimator.removeFinished();
 
     if (hoveredTile) {
         app.tooltip.update(hoveredTile->row, hoveredTile->col, true, dt);
@@ -1151,7 +1192,7 @@ static void updateInGame(AppState &app, float dt) {
     // Disable player input during cinematic.
     if (!app.transition.isActive() && !app.cinematic.isActive()) {
         handleInput(app.state, hoveredTile, app.selectedUnit, app.selectedCity, app.combatEffects, app.combatLog,
-                    app.combatLogScroll, app.cinematic, app.camera);
+                    app.combatLogScroll, app.cinematic, app.camera, app.unitAnimator);
         handleSaveLoad(app.state, app.selectedUnit);
         if (app.endTurnBtn.update(SCREEN_WIDTH, SCREEN_HEIGHT)) {
             processTurn(app.state);
@@ -1169,7 +1210,7 @@ static void updateInGame(AppState &app, float dt) {
 
     renderGameFrame(app.state, cam, hoveredTile, app.selectedUnit, app.selectedCity, app.modelManager,
                     app.combatEffects, app.combatLog, app.combatLogScroll, app.movementRange, app.tooltip,
-                    app.endTurnBtn);
+                    app.endTurnBtn, app.unitAnimator);
 }
 
 static void handleTransitionComplete(AppState &app) {
