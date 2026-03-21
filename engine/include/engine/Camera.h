@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/CameraCinematic.h"
 #include "raylib.h"
 
 namespace engine {
@@ -16,6 +17,12 @@ class Camera {
 
     // Use between BeginMode3D / EndMode3D.
     [[nodiscard]] Camera3D raw() const;
+
+    // Returns a snapshot of the current camera state (target, distance, angle).
+    [[nodiscard]] CameraSnapshot snapshot() const;
+
+    // Restores the camera from a snapshot (e.g., after a cinematic ends).
+    void restoreFromSnapshot(const CameraSnapshot &snap);
 
   private:
     Vector3 target_; // Point the camera looks at (on the XZ plane).

@@ -2,6 +2,7 @@
 
 #include "engine/BuildingRenderer.h"
 #include "engine/Camera.h"
+#include "engine/CameraCinematic.h"
 #include "engine/CityRenderer.h"
 #include "engine/CombatEffects.h"
 #include "engine/CombatLogRenderer.h"
@@ -724,10 +725,11 @@ static int findUnitAtTile(const game::GameState &state, int row, int col) {
 }
 
 /// Try to execute an attack from selectedUnit to clickedUnit.
-/// Spawns combat effects and logs the combat event.
+/// Spawns combat effects, logs the combat event, and triggers a camera cinematic.
 /// Returns true if an attack was successfully executed.
 static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit, int clickedUnit,
-                      engine::CombatEffectManager &effects, game::CombatLog &combatLog) {
+                      engine::CombatEffectManager &effects, game::CombatLog &combatLog,
+                      engine::CameraCinematic &cinematic, const engine::Camera &camera) {
     auto &units = state.units();
     auto &sel = units[selectedUnit];
     auto &target = units[clickedUnit];
@@ -792,6 +794,10 @@ static bool tryAttack(game::GameState &state, const engine::hex::TileCoord &tile
         Vector3 atkCenter = engine::hex::tileCenter(attackerRow, attackerCol);
         effects.spawnDeathEffect(atkCenter.x, engine::DEATH_EFFECT_Y_OFFSET, atkCenter.z, DAMAGE_COLOR_COUNTER);
     }
+
+    // ── Trigger camera cinematic ────────────────────────────────────────
+
+    cinematic.triggerCombat(defCenter, camera.snapshot());
 
     // ── Log combat event ─────────────────────────────────────────────────
 
@@ -875,7 +881,8 @@ static bool tryMoveUnit(game::GameState &state, const engine::hex::TileCoord &ti
 /// Handle click when a unit is already selected.
 /// Returns true if the click was consumed.
 static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit,
-                                    int clickedUnit, engine::CombatEffectManager &effects, game::CombatLog &combatLog) {
+                                    int clickedUnit, engine::CombatEffectManager &effects, game::CombatLog &combatLog,
+                                    engine::CameraCinematic &cinematic, const engine::Camera &camera) {
     auto &units = state.units();
     auto &sel = units[selectedUnit];
 
@@ -891,7 +898,7 @@ static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::T
 
     // Click on another unit — try attack or switch selection.
     if (clickedUnit != NO_SELECTION && clickedUnit != selectedUnit) {
-        if (tryAttack(state, tile, selectedUnit, clickedUnit, effects, combatLog)) {
+        if (tryAttack(state, tile, selectedUnit, clickedUnit, effects, combatLog, cinematic, camera)) {
             return true;
         }
         // Click on a friendly unit — select it instead.
@@ -919,7 +926,8 @@ static bool handleSelectedUnitClick(game::GameState &state, const engine::hex::T
 /// Handle a left-click on a tile for unit selection, movement, or attack.
 /// Returns true if the click was consumed by unit logic.
 static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord &tile, int &selectedUnit,
-                            engine::CombatEffectManager &effects, game::CombatLog &combatLog) {
+                            engine::CombatEffectManager &effects, game::CombatLog &combatLog,
+                            engine::CameraCinematic &cinematic, const engine::Camera &camera) {
     int clickedUnit = findUnitAtTile(state, tile.row, tile.col);
 
     if (selectedUnit != NO_SELECTION) {
@@ -928,7 +936,7 @@ static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord
             selectedUnit = NO_SELECTION;
             return false;
         }
-        return handleSelectedUnitClick(state, tile, selectedUnit, clickedUnit, effects, combatLog);
+        return handleSelectedUnitClick(state, tile, selectedUnit, clickedUnit, effects, combatLog, cinematic, camera);
     }
 
     // No unit selected — try to select one.
@@ -944,12 +952,13 @@ static bool handleUnitClick(game::GameState &state, const engine::hex::TileCoord
 
 static void handleInput(game::GameState &state, const std::optional<engine::hex::TileCoord> &hoveredTile,
                         int &selectedUnit, std::optional<game::CityId> &selectedCity,
-                        engine::CombatEffectManager &effects, game::CombatLog &combatLog, int &combatLogScroll) {
+                        engine::CombatEffectManager &effects, game::CombatLog &combatLog, int &combatLogScroll,
+                        engine::CameraCinematic &cinematic, const engine::Camera &camera) {
     // Clean up any dead units and adjust selected unit index accordingly.
     state.removeDeadUnits(&selectedUnit);
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hoveredTile) {
-        bool unitHandled = handleUnitClick(state, *hoveredTile, selectedUnit, effects, combatLog);
+        bool unitHandled = handleUnitClick(state, *hoveredTile, selectedUnit, effects, combatLog, cinematic, camera);
         if (!unitHandled) {
             handleCityClick(state.cities(), *hoveredTile, selectedCity);
         }
@@ -1068,6 +1077,7 @@ struct AppState {
 
     engine::ModelManager modelManager;
     engine::CombatEffectManager combatEffects;
+    engine::CameraCinematic cinematic;
     game::CombatLog combatLog;
     int combatLogScroll = 0;
 
@@ -1109,8 +1119,25 @@ static void updateSettings(AppState &app, int screenW, int screenH) {
 }
 
 static void updateInGame(AppState &app, float dt) {
-    app.camera.update();
-    Camera3D cam = app.camera.raw();
+    // Update cinematic if active; otherwise allow normal camera input.
+    if (app.cinematic.isActive()) {
+        // Allow player to skip the cinematic with Escape or Space.
+        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_SPACE)) {
+            app.cinematic.skip();
+            app.camera.restoreFromSnapshot(app.cinematic.currentSnapshot());
+        } else {
+            app.cinematic.update(dt);
+            // When cinematic finishes naturally, restore camera state.
+            if (!app.cinematic.isActive()) {
+                app.camera.restoreFromSnapshot(app.cinematic.currentSnapshot());
+            }
+        }
+    } else {
+        app.camera.update();
+    }
+
+    // Use cinematic camera during playback, normal camera otherwise.
+    Camera3D cam = app.cinematic.isActive() ? app.cinematic.getCamera() : app.camera.raw();
     auto hoveredTile = engine::input::mouseToTile(cam, MAP_ROWS, MAP_COLS);
 
     app.combatEffects.update(dt);
@@ -1121,9 +1148,10 @@ static void updateInGame(AppState &app, float dt) {
         app.tooltip.update(0, 0, false, dt);
     }
 
-    if (!app.transition.isActive()) {
+    // Disable player input during cinematic.
+    if (!app.transition.isActive() && !app.cinematic.isActive()) {
         handleInput(app.state, hoveredTile, app.selectedUnit, app.selectedCity, app.combatEffects, app.combatLog,
-                    app.combatLogScroll);
+                    app.combatLogScroll, app.cinematic, app.camera);
         handleSaveLoad(app.state, app.selectedUnit);
         if (app.endTurnBtn.update(SCREEN_WIDTH, SCREEN_HEIGHT)) {
             processTurn(app.state);

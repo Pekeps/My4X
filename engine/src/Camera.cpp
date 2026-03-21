@@ -87,4 +87,18 @@ Camera3D Camera::raw() const {
     return cam;
 }
 
+CameraSnapshot Camera::snapshot() const {
+    CameraSnapshot snap;
+    snap.target = target_;
+    snap.distance = distance_;
+    snap.angle = angle_;
+    return snap;
+}
+
+void Camera::restoreFromSnapshot(const CameraSnapshot &snap) {
+    target_ = snap.target;
+    distance_ = snap.distance;
+    angle_ = snap.angle;
+}
+
 } // namespace engine
