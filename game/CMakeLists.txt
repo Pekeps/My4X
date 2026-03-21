@@ -28,6 +28,7 @@ add_library(my4x_game STATIC
     src/MapGenerator.cpp
     src/Pathfinding.cpp
     src/ZoneOfControl.cpp
+    src/LobbyManager.cpp
 )
 
 target_include_directories(my4x_game PUBLIC include)
