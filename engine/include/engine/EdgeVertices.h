@@ -17,9 +17,9 @@ struct EdgeVertices {
 /// Linearly interpolate between two Vector3 values.
 [[nodiscard]] inline Vector3 lerpVector3(Vector3 a, Vector3 b, float t) {
     return {
-        .x = a.x + (b.x - a.x) * t,
-        .y = a.y + (b.y - a.y) * t,
-        .z = a.z + (b.z - a.z) * t,
+        .x = a.x + ((b.x - a.x) * t),
+        .y = a.y + ((b.y - a.y) * t),
+        .z = a.z + ((b.z - a.z) * t),
     };
 }
 
@@ -27,13 +27,13 @@ struct EdgeVertices {
 [[nodiscard]] inline Color lerpColor(Color a, Color b, float t) {
     return {
         .r = static_cast<unsigned char>(static_cast<float>(a.r) +
-                                        (static_cast<float>(b.r) - static_cast<float>(a.r)) * t),
+                                        ((static_cast<float>(b.r) - static_cast<float>(a.r)) * t)),
         .g = static_cast<unsigned char>(static_cast<float>(a.g) +
-                                        (static_cast<float>(b.g) - static_cast<float>(a.g)) * t),
+                                        ((static_cast<float>(b.g) - static_cast<float>(a.g)) * t)),
         .b = static_cast<unsigned char>(static_cast<float>(a.b) +
-                                        (static_cast<float>(b.b) - static_cast<float>(a.b)) * t),
+                                        ((static_cast<float>(b.b) - static_cast<float>(a.b)) * t)),
         .a = static_cast<unsigned char>(static_cast<float>(a.a) +
-                                        (static_cast<float>(b.a) - static_cast<float>(a.a)) * t),
+                                        ((static_cast<float>(b.a) - static_cast<float>(a.a)) * t)),
     };
 }
 

@@ -53,8 +53,8 @@ static constexpr std::array<std::array<int, 2>, HEX_DIRECTION_COUNT> ODD_ROW_OFF
                                                                       int mapWidth) {
     const auto &offsets = ((row & 1) == 0) ? EVEN_ROW_OFFSETS : ODD_ROW_OFFSETS;
     int idx = static_cast<int>(dir);
-    int nr = row + offsets[idx][0];
-    int nc = col + offsets[idx][1];
+    int nr = row + offsets.at(idx).at(0);
+    int nc = col + offsets.at(idx).at(1);
     if (nr < 0 || nr >= mapHeight || nc < 0 || nc >= mapWidth) {
         return std::nullopt;
     }
