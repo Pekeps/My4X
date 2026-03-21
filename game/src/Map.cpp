@@ -8,6 +8,34 @@ namespace game {
 
 namespace {
 
+constexpr int WATER_ELEVATION = 0;
+constexpr int PLAINS_ELEVATION = 1;
+constexpr int DESERT_ELEVATION = 1;
+constexpr int SWAMP_ELEVATION = 1;
+constexpr int FOREST_ELEVATION = 1;
+constexpr int HILLS_ELEVATION = 2;
+constexpr int MOUNTAIN_ELEVATION = 4;
+
+constexpr int defaultElevationForTerrain(TerrainType terrain) {
+    switch (terrain) {
+    case TerrainType::Plains:
+        return PLAINS_ELEVATION;
+    case TerrainType::Hills:
+        return HILLS_ELEVATION;
+    case TerrainType::Forest:
+        return FOREST_ELEVATION;
+    case TerrainType::Water:
+        return WATER_ELEVATION;
+    case TerrainType::Mountain:
+        return MOUNTAIN_ELEVATION;
+    case TerrainType::Desert:
+        return DESERT_ELEVATION;
+    case TerrainType::Swamp:
+        return SWAMP_ELEVATION;
+    }
+    return PLAINS_ELEVATION;
+}
+
 constexpr std::array<TerrainType, TERRAIN_TYPE_COUNT> allTerrains = {
     TerrainType::Plains,   TerrainType::Hills,  TerrainType::Forest, TerrainType::Water,
     TerrainType::Mountain, TerrainType::Desert, TerrainType::Swamp,
@@ -23,7 +51,9 @@ std::vector<std::vector<Tile>> generateTiles(int height, int width, std::uint64_
         std::vector<Tile> rowTiles;
         rowTiles.reserve(width);
         for (int col = 0; col < width; ++col) {
-            rowTiles.emplace_back(row, col, allTerrains.at(dist(rng)));
+            auto terrain = allTerrains.at(dist(rng));
+            rowTiles.emplace_back(row, col, terrain);
+            rowTiles.back().setElevation(defaultElevationForTerrain(terrain));
         }
         tiles.push_back(std::move(rowTiles));
     }
