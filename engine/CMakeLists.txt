@@ -19,6 +19,7 @@ add_library(my4x_engine STATIC
     src/EndTurnButton.cpp
     src/ModelManager.cpp
     src/AudioManager.cpp
+    src/CameraCinematic.cpp
 )
 
 target_include_directories(my4x_engine PUBLIC include)
