@@ -89,7 +89,7 @@ bool NetworkClient::submitAction(const std::string &gameId, const std::string &p
     // Perform a synchronous-on-background-thread call using a detached thread
     // so the caller (render thread) is never blocked.
     // The stub and channel are thread-safe for concurrent RPCs.
-    auto localStub = stub_.get();
+    auto *localStub = stub_.get();
     auto reqCopy = std::make_shared<game_proto::SubmitActionRequest>(request);
 
     std::thread([localStub, reqCopy]() {
@@ -134,6 +134,8 @@ void NetworkClient::networkThreadFunc() {
         bool ok = false;
         auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(DEFAULT_RPC_TIMEOUT_MS);
         grpc::CompletionQueue::NextStatus status = completionQueue_->AsyncNext(&tag, &ok, deadline);
+
+        (void)ok; // Will be used when processing async RPC completions.
 
         if (status == grpc::CompletionQueue::SHUTDOWN) {
             break;
