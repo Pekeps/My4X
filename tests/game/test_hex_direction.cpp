@@ -53,4 +53,22 @@ TEST(HexDirectionTest, NeighborOutOfBounds) {
 TEST(HexDirectionTest, AllDirectionsHasSixEntries) {
     EXPECT_EQ(game::ALL_DIRECTIONS.size(), 6);
 }
+
+TEST(HexDirectionTest, NextDirection) {
+    EXPECT_EQ(game::nextDirection(game::HexDirection::NE), game::HexDirection::E);
+    EXPECT_EQ(game::nextDirection(game::HexDirection::NW), game::HexDirection::NE);
+}
+
+TEST(HexDirectionTest, PreviousDirection) {
+    EXPECT_EQ(game::previousDirection(game::HexDirection::E), game::HexDirection::NE);
+    EXPECT_EQ(game::previousDirection(game::HexDirection::NE), game::HexDirection::NW);
+}
+
+TEST(HexDirectionTest, Next2Direction) {
+    EXPECT_EQ(game::next2Direction(game::HexDirection::NE), game::HexDirection::SE);
+}
+
+TEST(HexDirectionTest, Previous2Direction) {
+    EXPECT_EQ(game::previous2Direction(game::HexDirection::SE), game::HexDirection::NE);
+}
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

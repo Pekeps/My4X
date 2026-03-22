@@ -26,6 +26,26 @@ static constexpr int HEX_DIRECTION_COUNT = 6;
     return static_cast<HexDirection>((static_cast<int>(dir) + OPPOSITE_OFFSET) % HEX_DIRECTION_COUNT);
 }
 
+/// Return the next direction clockwise.
+[[nodiscard]] constexpr HexDirection nextDirection(HexDirection dir) {
+    return static_cast<HexDirection>((static_cast<int>(dir) + 1) % HEX_DIRECTION_COUNT);
+}
+
+/// Return the previous direction counter-clockwise.
+[[nodiscard]] constexpr HexDirection previousDirection(HexDirection dir) {
+    return static_cast<HexDirection>((static_cast<int>(dir) + HEX_DIRECTION_COUNT - 1) % HEX_DIRECTION_COUNT);
+}
+
+/// Return the direction two steps clockwise.
+[[nodiscard]] constexpr HexDirection next2Direction(HexDirection dir) {
+    return static_cast<HexDirection>((static_cast<int>(dir) + 2) % HEX_DIRECTION_COUNT);
+}
+
+/// Return the direction two steps counter-clockwise.
+[[nodiscard]] constexpr HexDirection previous2Direction(HexDirection dir) {
+    return static_cast<HexDirection>((static_cast<int>(dir) + HEX_DIRECTION_COUNT - 2) % HEX_DIRECTION_COUNT);
+}
+
 /// Neighbor coordinate offsets for even rows (row % 2 == 0) in odd-r layout.
 /// Order: NE, E, SE, SW, W, NW — matches HexDirection enum.
 static constexpr std::array<std::array<int, 2>, HEX_DIRECTION_COUNT> EVEN_ROW_OFFSETS = {{
