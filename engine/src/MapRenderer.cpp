@@ -337,6 +337,13 @@ static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map,
     Vector3 bv2 = perturb(bv2Raw);
     EdgeVertices e2 = makeEdge(bv1, bv2);
 
+    // River channel carving on neighbor side: lower e2.v3 when neighbor has river through opposite edge.
+    auto oppositeDir = game::oppositeDirection(dir);
+    const auto &neighborTile = map.tile(nr, nc);
+    if (neighborTile.hasRiverThroughEdge(oppositeDir)) {
+        e2.v3.y = neighborY + hex_metrics::STREAM_BED_OFFSET;
+    }
+
     auto edgeType = classifyEdge(cellElev, neighborElev);
     if (edgeType == HexEdgeType::Slope) {
         triangulateEdgeTerraces(builder, e1, cellColor, e2, neighborColor);
@@ -392,6 +399,9 @@ static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int r
     Color cellColor = getCellColor(map, row, col);
     int cellElev = map.tile(row, col).elevation();
 
+    const auto &tile = map.tile(row, col);
+    float streamBedY = center.y + hex_metrics::STREAM_BED_OFFSET;
+
     for (int d = 0; d < HEX_SIDES; ++d) {
         // Perturb the solid corners FIRST, then create EdgeVertices from them.
         // This ensures all triangles sharing these corners get identical perturbed positions.
@@ -401,6 +411,11 @@ static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int r
         Vector3 v2 = perturb({.x = center.x + sc2.x, .y = center.y, .z = center.z + sc2.z});
 
         EdgeVertices edge = makeEdge(v1, v2);
+
+        // River channel carving: lower midpoint vertex when river passes through this edge.
+        if (tile.hasRiverThroughEdge(game::ALL_DIRECTIONS.at(d))) {
+            edge.v3.y = streamBedY;
+        }
 
         // Triangle fan from center to subdivided edge (4 triangles).
         triangulateEdgeFan(builder, center, edge, cellColor);
@@ -440,10 +455,118 @@ static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int r
     }
 }
 
+// ── Water color constants ────────────────────────────────────────────────────
+
+static constexpr unsigned char RIVER_WATER_R = 30;
+static constexpr unsigned char RIVER_WATER_G = 100;
+static constexpr unsigned char RIVER_WATER_B = 200;
+static constexpr unsigned char RIVER_WATER_A = 180;
+
+static constexpr unsigned char OPEN_WATER_R = 40;
+static constexpr unsigned char OPEN_WATER_G = 120;
+static constexpr unsigned char OPEN_WATER_B = 210;
+static constexpr unsigned char OPEN_WATER_A = 200;
+
+// ── Water hex corners helper ─────────────────────────────────────────────────
+
+/// Compute the 6 corner vertices of a hex at a given center and radius.
+static std::array<Vector3, HEX_SIDES> hexCornersAtRadius(Vector3 center, float radius) {
+    static constexpr float START_ANGLE = 30.0F;
+    static constexpr float DEGREES_PER_SIDE = 60.0F;
+    std::array<Vector3, HEX_SIDES> corners{};
+    for (int i = 0; i < HEX_SIDES; ++i) {
+        float angle = (START_ANGLE + (static_cast<float>(i) * DEGREES_PER_SIDE)) * DEG_TO_RAD;
+        corners.at(i) = {
+            .x = center.x + (radius * cosf(angle)),
+            .y = center.y,
+            .z = center.z + (radius * sinf(angle)),
+        };
+    }
+    return corners;
+}
+
+// ── River water surface rendering ────────────────────────────────────────────
+
+/// Render river water surface quads inside carved channels.
+static void renderRiverWater(HexMeshBuilder &waterBuilder, const game::Map &map) {
+    static constexpr Color RIVER_COLOR = {RIVER_WATER_R, RIVER_WATER_G, RIVER_WATER_B, RIVER_WATER_A};
+
+    for (int row = 0; row < map.height(); ++row) {
+        for (int col = 0; col < map.width(); ++col) {
+            const auto &tile = map.tile(row, col);
+            if (!tile.hasRiver()) {
+                continue;
+            }
+
+            Vector3 center = hex::tileCenter(row, col);
+            float cellY = elevationY(map, row, col);
+            center.y = cellY;
+            float waterY = cellY + hex_metrics::WATER_SURFACE_OFFSET;
+
+            // For each direction with a river, draw a water quad at water surface level
+            // inside the carved channel (between center and the edge midpoint).
+            for (int d = 0; d < HEX_SIDES; ++d) {
+                if (!tile.hasRiverThroughEdge(game::ALL_DIRECTIONS.at(d))) {
+                    continue;
+                }
+
+                // Compute the same edge positions as triangulateCell, but at water surface Y.
+                Vector3 sc1 = getFirstSolidCorner(d);
+                Vector3 sc2 = getSecondSolidCorner(d);
+                Vector3 v1 = perturb({.x = center.x + sc1.x, .y = center.y, .z = center.z + sc1.z});
+                Vector3 v2 = perturb({.x = center.x + sc2.x, .y = center.y, .z = center.z + sc2.z});
+
+                EdgeVertices edge = makeEdge(v1, v2);
+
+                // Water quad: from v2 to v4 (the two vertices flanking the channel midpoint v3)
+                // at water surface Y level.
+                Vector3 wv2 = {.x = edge.v2.x, .y = waterY, .z = edge.v2.z};
+                Vector3 wv3 = {.x = edge.v3.x, .y = waterY, .z = edge.v3.z};
+                Vector3 wv4 = {.x = edge.v4.x, .y = waterY, .z = edge.v4.z};
+                Vector3 wCenter = {.x = center.x, .y = waterY, .z = center.z};
+
+                // Two triangles forming the water surface inside the channel.
+                waterBuilder.addTriangle(wCenter, wv2, wv3, RIVER_COLOR);
+                waterBuilder.addTriangle(wCenter, wv3, wv4, RIVER_COLOR);
+            }
+        }
+    }
+}
+
+// ── Open water body rendering ────────────────────────────────────────────────
+
+/// Render flat hex surfaces for submerged (underwater) tiles.
+static void renderOpenWater(HexMeshBuilder &openWaterBuilder, const game::Map &map) {
+    static constexpr Color OPEN_WATER_COLOR = {OPEN_WATER_R, OPEN_WATER_G, OPEN_WATER_B, OPEN_WATER_A};
+
+    for (int row = 0; row < map.height(); ++row) {
+        for (int col = 0; col < map.width(); ++col) {
+            const auto &tile = map.tile(row, col);
+            if (!tile.isUnderwater()) {
+                continue;
+            }
+
+            float waterY =
+                (static_cast<float>(tile.waterLevel()) * hex_metrics::ELEVATION_STEP) + hex_metrics::WATER_LEVEL_OFFSET;
+            Vector3 waterCenter = hex::tileCenter(row, col);
+            waterCenter.y = waterY;
+
+            auto corners = hexCornersAtRadius(waterCenter, hex_metrics::HEX_RADIUS);
+
+            // Draw 6 triangles from center to each edge of the hex.
+            for (int i = 0; i < HEX_SIDES; ++i) {
+                int next = (i + 1) % HEX_SIDES;
+                openWaterBuilder.addTriangle(waterCenter, corners.at(next), corners.at(i), OPEN_WATER_COLOR);
+            }
+        }
+    }
+}
+
 // ── Main draw function ───────────────────────────────────────────────────────
 
 void drawMap(const game::Map &map, std::optional<hex::TileCoord> /*highlightedTile*/, const game::FogOfWar * /*fog*/,
              game::FactionId /*playerFactionId*/) {
+    // Pass 1: Terrain mesh.
     HexMeshBuilder builder;
 
     for (int row = 0; row < map.height(); ++row) {
@@ -453,6 +576,16 @@ void drawMap(const game::Map &map, std::optional<hex::TileCoord> /*highlightedTi
     }
 
     builder.flush();
+
+    // Pass 2: River water surfaces.
+    HexMeshBuilder waterBuilder;
+    renderRiverWater(waterBuilder, map);
+    waterBuilder.flush();
+
+    // Pass 3: Open water bodies (submerged tiles).
+    HexMeshBuilder openWaterBuilder;
+    renderOpenWater(openWaterBuilder, map);
+    openWaterBuilder.flush();
 }
 
 } // namespace engine
