@@ -50,6 +50,7 @@ add_executable(my4x_tests
     engine/test_camera_cinematic.cpp
     engine/test_unit_animator.cpp
     engine/test_hex_mesh_builder.cpp
+    engine/test_perlin_noise.cpp
     game/test_networking_integration.cpp
     game/test_game_persistence.cpp
 )

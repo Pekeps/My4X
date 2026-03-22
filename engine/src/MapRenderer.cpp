@@ -5,6 +5,7 @@
 #include "engine/HexGrid.h"
 #include "engine/HexMeshBuilder.h"
 #include "engine/HexMetrics.h"
+#include "engine/PerlinNoise.h"
 #include "engine/TerrainColors.h"
 #include "game/HexDirection.h"
 
@@ -21,6 +22,13 @@ namespace engine {
 static constexpr float DEG_TO_RAD = std::numbers::pi_v<float> / 180.0F;
 static constexpr int HEX_SIDES = 6;
 static constexpr int NEAR_DIRECTION_COUNT = 3;
+static constexpr uint64_t NOISE_SEED = 42;
+
+/// Global Perlin noise generator for vertex perturbation.
+static const PerlinNoise &noiseGenerator() {
+    static const PerlinNoise noise(NOISE_SEED);
+    return noise;
+}
 
 /// Maps HexDirection index to the two corner vertex indices forming that edge.
 static constexpr std::array<std::array<int, 2>, HEX_SIDES> DIRECTION_EDGE = {{
@@ -83,6 +91,39 @@ static Color getCellColor(const game::Map &map, int row, int col) {
     return terrain_colors::terrainFillColor(map.tile(row, col).terrainType());
 }
 
+// ── Perlin noise perturbation ────────────────────────────────────────────────
+
+/// Perturb a vertex position using Perlin noise (XZ only, Y unchanged).
+static Vector3 perturb(Vector3 pos) {
+    const auto &noise = noiseGenerator();
+    float sx = pos.x * hex_metrics::NOISE_SCALE;
+    float sz = pos.z * hex_metrics::NOISE_SCALE;
+    return {
+        .x = pos.x + (noise.sample(sx, sz) * hex_metrics::PERTURBATION_STRENGTH),
+        .y = pos.y,
+        .z = pos.z + (noise.sample(sx + hex_metrics::NOISE_AXIS_OFFSET, sz + hex_metrics::NOISE_AXIS_OFFSET) *
+                      hex_metrics::PERTURBATION_STRENGTH),
+    };
+}
+
+// ── Edge strip helpers ───────────────────────────────────────────────────────
+
+/// Triangulate a strip of triangles from center to an EdgeVertices (triangle fan).
+/// Perturbs edge vertices but NOT the center.
+static void triangulateEdgeFan(HexMeshBuilder &builder, Vector3 center, EdgeVertices edge, Color color) {
+    builder.addTriangle(center, perturb(edge.v1), perturb(edge.v2), color);
+    builder.addTriangle(center, perturb(edge.v2), perturb(edge.v3), color);
+    builder.addTriangle(center, perturb(edge.v3), perturb(edge.v4), color);
+}
+
+/// Triangulate a quad strip between two EdgeVertices (3 quads).
+/// Perturbs all vertices.
+static void triangulateEdgeStrip(HexMeshBuilder &builder, EdgeVertices e1, Color c1, EdgeVertices e2, Color c2) {
+    builder.addQuad(perturb(e1.v1), perturb(e1.v2), perturb(e2.v2), perturb(e2.v1), c1, c1, c2, c2);
+    builder.addQuad(perturb(e1.v2), perturb(e1.v3), perturb(e2.v3), perturb(e2.v2), c1, c1, c2, c2);
+    builder.addQuad(perturb(e1.v3), perturb(e1.v4), perturb(e2.v4), perturb(e2.v3), c1, c1, c2, c2);
+}
+
 // ── Terrace interpolation (Part 3) ───────────────────────────────────────────
 
 static Vector3 terraceLerp(Vector3 a, Vector3 b, int step) {
@@ -103,29 +144,37 @@ static Color terraceLerpColor(Color a, Color b, int step) {
     return lerpColor(a, b, h);
 }
 
-/// Edge terraces between two cells (slope connection).
-static void triangulateEdgeTerraces(HexMeshBuilder &builder, Vector3 beginLeft, Vector3 beginRight, Color beginColor,
-                                    Vector3 endLeft, Vector3 endRight, Color endColor) {
-    Vector3 v3 = terraceLerp(beginLeft, endLeft, 1);
-    Vector3 v4 = terraceLerp(beginRight, endRight, 1);
+/// Interpolate an EdgeVertices between two edge positions at a terrace step.
+static EdgeVertices terraceEdgeLerp(EdgeVertices a, EdgeVertices b, int step) {
+    return {
+        .v1 = terraceLerp(a.v1, b.v1, step),
+        .v2 = terraceLerp(a.v2, b.v2, step),
+        .v3 = terraceLerp(a.v3, b.v3, step),
+        .v4 = terraceLerp(a.v4, b.v4, step),
+    };
+}
+
+/// Edge terraces between two cells (slope connection) using EdgeVertices.
+static void triangulateEdgeTerraces(HexMeshBuilder &builder, EdgeVertices begin, Color beginColor, EdgeVertices end,
+                                    Color endColor) {
+    EdgeVertices e2 = terraceEdgeLerp(begin, end, 1);
     Color c2 = terraceLerpColor(beginColor, endColor, 1);
 
-    builder.addQuad(beginLeft, beginRight, v4, v3, beginColor, beginColor, c2, c2);
+    triangulateEdgeStrip(builder, begin, beginColor, e2, c2);
 
     for (int i = 2; i < hex_metrics::TERRACE_INTERPOLATION_STEPS; ++i) {
-        Vector3 v1 = v3;
-        Vector3 v2 = v4;
+        EdgeVertices e1 = e2;
         Color c1 = c2;
-        v3 = terraceLerp(beginLeft, endLeft, i);
-        v4 = terraceLerp(beginRight, endRight, i);
+        e2 = terraceEdgeLerp(begin, end, i);
         c2 = terraceLerpColor(beginColor, endColor, i);
-        builder.addQuad(v1, v2, v4, v3, c1, c1, c2, c2);
+        triangulateEdgeStrip(builder, e1, c1, e2, c2);
     }
 
-    builder.addQuad(v3, v4, endRight, endLeft, c2, c2, endColor, endColor);
+    triangulateEdgeStrip(builder, e2, c2, end, endColor);
 }
 
 // ── Corner triangulation (Part 3 — all cases) ───────────────────────────────
+// Corner vertices are perturbed except cliff boundary vertices.
 // NOLINTBEGIN(readability-suspicious-call-argument)
 
 static void triangulateCornerTerraces(HexMeshBuilder &builder, Vector3 begin, Color beginColor, Vector3 left,
@@ -135,7 +184,7 @@ static void triangulateCornerTerraces(HexMeshBuilder &builder, Vector3 begin, Co
     Color c3 = terraceLerpColor(beginColor, leftColor, 1);
     Color c4 = terraceLerpColor(beginColor, rightColor, 1);
 
-    builder.addTriangle(begin, v3, v4, beginColor, c3, c4);
+    builder.addTriangle(perturb(begin), perturb(v3), perturb(v4), beginColor, c3, c4);
 
     for (int i = 2; i < hex_metrics::TERRACE_INTERPOLATION_STEPS; ++i) {
         Vector3 v1 = v3;
@@ -146,28 +195,29 @@ static void triangulateCornerTerraces(HexMeshBuilder &builder, Vector3 begin, Co
         v4 = terraceLerp(begin, right, i);
         c3 = terraceLerpColor(beginColor, leftColor, i);
         c4 = terraceLerpColor(beginColor, rightColor, i);
-        builder.addQuad(v1, v2, v4, v3, c1, c2, c4, c3);
+        builder.addQuad(perturb(v1), perturb(v2), perturb(v4), perturb(v3), c1, c2, c4, c3);
     }
 
-    builder.addQuad(v3, v4, right, left, c3, c4, rightColor, leftColor);
+    builder.addQuad(perturb(v3), perturb(v4), perturb(right), perturb(left), c3, c4, rightColor, leftColor);
 }
 
 static void triangulateBoundaryTriangle(HexMeshBuilder &builder, Vector3 begin, Color beginColor, Vector3 left,
                                         Color leftColor, Vector3 boundary, Color boundaryColor) {
+    // Boundary vertex is NOT perturbed (prevents mesh cracks at cliff boundaries).
     Vector3 v2 = terraceLerp(begin, left, 1);
     Color c2 = terraceLerpColor(beginColor, leftColor, 1);
 
-    builder.addTriangle(begin, v2, boundary, beginColor, c2, boundaryColor);
+    builder.addTriangle(perturb(begin), perturb(v2), boundary, beginColor, c2, boundaryColor);
 
     for (int i = 2; i < hex_metrics::TERRACE_INTERPOLATION_STEPS; ++i) {
         Vector3 v1 = v2;
         Color c1 = c2;
         v2 = terraceLerp(begin, left, i);
         c2 = terraceLerpColor(beginColor, leftColor, i);
-        builder.addTriangle(v1, v2, boundary, c1, c2, boundaryColor);
+        builder.addTriangle(perturb(v1), perturb(v2), boundary, c1, c2, boundaryColor);
     }
 
-    builder.addTriangle(v2, left, boundary, c2, leftColor, boundaryColor);
+    builder.addTriangle(perturb(v2), perturb(left), boundary, c2, leftColor, boundaryColor);
 }
 
 static void triangulateCornerTerracesCliff(HexMeshBuilder &builder, Vector3 begin, Color beginColor, int beginElev,
@@ -185,7 +235,7 @@ static void triangulateCornerTerracesCliff(HexMeshBuilder &builder, Vector3 begi
     if (classifyEdge(leftElev, rightElev) == HexEdgeType::Slope) {
         triangulateBoundaryTriangle(builder, left, leftColor, right, rightColor, boundary, boundaryColor);
     } else {
-        builder.addTriangle(left, right, boundary, leftColor, rightColor, boundaryColor);
+        builder.addTriangle(perturb(left), perturb(right), boundary, leftColor, rightColor, boundaryColor);
     }
 }
 
@@ -204,7 +254,7 @@ static void triangulateCornerCliffTerraces(HexMeshBuilder &builder, Vector3 begi
     if (classifyEdge(leftElev, rightElev) == HexEdgeType::Slope) {
         triangulateBoundaryTriangle(builder, left, leftColor, right, rightColor, boundary, boundaryColor);
     } else {
-        builder.addTriangle(left, right, boundary, leftColor, rightColor, boundaryColor);
+        builder.addTriangle(perturb(left), perturb(right), boundary, leftColor, rightColor, boundaryColor);
     }
 }
 
@@ -238,19 +288,19 @@ static void triangulateCorner(HexMeshBuilder &builder, Vector3 bottom, Color bot
                                            bottomColor, bottomElev);
         }
     } else {
-        builder.addTriangle(bottom, left, right, bottomColor, leftColor, rightColor);
+        builder.addTriangle(perturb(bottom), perturb(left), perturb(right), bottomColor, leftColor, rightColor);
     }
 }
 
 // NOLINTEND(readability-suspicious-call-argument)
 
-// ── Connection logic (Part 2 + Part 3) ───────────────────────────────────────
+// ── Connection logic (Part 2 + Part 3 + Part 4 edge subdivision) ─────────────
 
-/// Build the bridge quad and corner triangle for one direction.
+/// Build the bridge quad strip and corner triangle for one direction.
 /// Called only for NE, E, SE (d=0,1,2).
 // NOLINTBEGIN(readability-suspicious-call-argument)
 static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map, int row, int col, int dirIdx,
-                                  Vector3 v1, Vector3 v2, Color cellColor, int cellElev) {
+                                  EdgeVertices e1, Color cellColor, int cellElev) {
     auto dir = game::ALL_DIRECTIONS.at(dirIdx);
     auto neighborOpt = game::neighborCoord(row, col, dir, map.height(), map.width());
     if (!neighborOpt) {
@@ -260,16 +310,21 @@ static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map,
     Color neighborColor = getCellColor(map, nr, nc);
     int neighborElev = map.tile(nr, nc).elevation();
 
-    // Bridge quad: v3 = v1 + bridge, v4 = v2 + bridge, with neighbor's Y.
+    // Bridge vector and neighbor edge vertices.
     Vector3 bridge = getBridge(dirIdx);
-    Vector3 v3 = {.x = v1.x + bridge.x, .y = elevationY(map, nr, nc), .z = v1.z + bridge.z};
-    Vector3 v4 = {.x = v2.x + bridge.x, .y = elevationY(map, nr, nc), .z = v2.z + bridge.z};
+    float neighborY = elevationY(map, nr, nc);
+    EdgeVertices e2 = {
+        .v1 = {.x = e1.v1.x + bridge.x, .y = neighborY, .z = e1.v1.z + bridge.z},
+        .v2 = {.x = e1.v2.x + bridge.x, .y = neighborY, .z = e1.v2.z + bridge.z},
+        .v3 = {.x = e1.v3.x + bridge.x, .y = neighborY, .z = e1.v3.z + bridge.z},
+        .v4 = {.x = e1.v4.x + bridge.x, .y = neighborY, .z = e1.v4.z + bridge.z},
+    };
 
     auto edgeType = classifyEdge(cellElev, neighborElev);
     if (edgeType == HexEdgeType::Slope) {
-        triangulateEdgeTerraces(builder, v1, v2, cellColor, v3, v4, neighborColor);
+        triangulateEdgeTerraces(builder, e1, cellColor, e2, neighborColor);
     } else {
-        builder.addQuad(v1, v2, v4, v3, cellColor, cellColor, neighborColor, neighborColor);
+        triangulateEdgeStrip(builder, e1, cellColor, e2, neighborColor);
     }
 
     // Corner triangle: only for NE (d=0) and E (d=1).
@@ -281,24 +336,24 @@ static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map,
         Color nextNeighborColor = getCellColor(map, nnr, nnc);
         int nextNeighborElev = map.tile(nnr, nnc).elevation();
 
-        // v5 = v2 + bridge(nextDirection), with next neighbor's Y.
+        // v5 = e1.v4 + bridge(nextDirection), with next neighbor's Y.
         Vector3 nextBridge = getBridge(nextD);
-        Vector3 v5 = {.x = v2.x + nextBridge.x, .y = elevationY(map, nnr, nnc), .z = v2.z + nextBridge.z};
+        Vector3 v5 = {.x = e1.v4.x + nextBridge.x, .y = elevationY(map, nnr, nnc), .z = e1.v4.z + nextBridge.z};
 
         // Determine bottom cell and dispatch.
         if (cellElev <= neighborElev) {
             if (cellElev <= nextNeighborElev) {
-                triangulateCorner(builder, v2, cellColor, cellElev, v4, neighborColor, neighborElev, v5,
+                triangulateCorner(builder, e1.v4, cellColor, cellElev, e2.v4, neighborColor, neighborElev, v5,
                                   nextNeighborColor, nextNeighborElev);
             } else {
-                triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, v2, cellColor, cellElev, v4,
+                triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, e1.v4, cellColor, cellElev, e2.v4,
                                   neighborColor, neighborElev);
             }
         } else if (neighborElev <= nextNeighborElev) {
-            triangulateCorner(builder, v4, neighborColor, neighborElev, v5, nextNeighborColor, nextNeighborElev, v2,
-                              cellColor, cellElev);
+            triangulateCorner(builder, e2.v4, neighborColor, neighborElev, v5, nextNeighborColor, nextNeighborElev,
+                              e1.v4, cellColor, cellElev);
         } else {
-            triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, v2, cellColor, cellElev, v4,
+            triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, e1.v4, cellColor, cellElev, e2.v4,
                               neighborColor, neighborElev);
         }
     }
@@ -315,17 +370,20 @@ static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int r
     int cellElev = map.tile(row, col).elevation();
 
     for (int d = 0; d < HEX_SIDES; ++d) {
-        // Solid inner triangle: center → v1 → v2
+        // Create EdgeVertices from the two solid corners for this direction.
         Vector3 sc1 = getFirstSolidCorner(d);
         Vector3 sc2 = getSecondSolidCorner(d);
         Vector3 v1 = {.x = center.x + sc1.x, .y = center.y, .z = center.z + sc1.z};
         Vector3 v2 = {.x = center.x + sc2.x, .y = center.y, .z = center.z + sc2.z};
 
-        builder.addTriangle(center, v1, v2, cellColor);
+        EdgeVertices edge = makeEdge(v1, v2);
+
+        // Triangle fan from center to subdivided edge (3 triangles).
+        triangulateEdgeFan(builder, center, edge, cellColor);
 
         // Edge and corner connections (only NE, E, SE)
         if (d < NEAR_DIRECTION_COUNT) {
-            triangulateConnection(builder, map, row, col, d, v1, v2, cellColor, cellElev);
+            triangulateConnection(builder, map, row, col, d, edge, cellColor, cellElev);
         }
     }
 }
