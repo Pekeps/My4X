@@ -114,14 +114,16 @@ static void triangulateEdgeFan(HexMeshBuilder &builder, Vector3 center, EdgeVert
     builder.addTriangle(center, edge.v1, edge.v2, color);
     builder.addTriangle(center, edge.v2, edge.v3, color);
     builder.addTriangle(center, edge.v3, edge.v4, color);
+    builder.addTriangle(center, edge.v4, edge.v5, color);
 }
 
-/// Triangulate a quad strip between two EdgeVertices (3 quads).
+/// Triangulate a quad strip between two EdgeVertices (4 quads).
 /// Edge vertices should already be perturbed before calling this.
 static void triangulateEdgeStrip(HexMeshBuilder &builder, EdgeVertices e1, Color c1, EdgeVertices e2, Color c2) {
     builder.addQuad(e1.v1, e1.v2, e2.v2, e2.v1, c1, c1, c2, c2);
     builder.addQuad(e1.v2, e1.v3, e2.v3, e2.v2, c1, c1, c2, c2);
     builder.addQuad(e1.v3, e1.v4, e2.v4, e2.v3, c1, c1, c2, c2);
+    builder.addQuad(e1.v4, e1.v5, e2.v5, e2.v4, c1, c1, c2, c2);
 }
 
 // ── Terrace interpolation (Part 3) ───────────────────────────────────────────
@@ -151,6 +153,7 @@ static EdgeVertices terraceEdgeLerp(EdgeVertices a, EdgeVertices b, int step) {
         .v2 = terraceLerp(a.v2, b.v2, step),
         .v3 = terraceLerp(a.v3, b.v3, step),
         .v4 = terraceLerp(a.v4, b.v4, step),
+        .v5 = terraceLerp(a.v5, b.v5, step),
     };
 }
 
@@ -312,7 +315,7 @@ static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map,
     int neighborElev = map.tile(nr, nc).elevation();
 
     // Bridge: perturb the two bridge endpoints, then create EdgeVertices from them.
-    // e1.v1 and e1.v4 are already perturbed (from triangulateCell).
+    // e1.v1 and e1.v5 are already perturbed (from triangulateCell).
     // The bridge offset is added to the UNPERTURBED solid corners to get the
     // unperturbed bridge endpoints, then those are perturbed.
     Vector3 bridge = getBridge(dirIdx);
@@ -360,17 +363,17 @@ static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map,
         // Determine bottom cell and dispatch.
         if (cellElev <= neighborElev) {
             if (cellElev <= nextNeighborElev) {
-                triangulateCorner(builder, e1.v4, cellColor, cellElev, e2.v4, neighborColor, neighborElev, v5,
+                triangulateCorner(builder, e1.v5, cellColor, cellElev, e2.v5, neighborColor, neighborElev, v5,
                                   nextNeighborColor, nextNeighborElev);
             } else {
-                triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, e1.v4, cellColor, cellElev, e2.v4,
+                triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, e1.v5, cellColor, cellElev, e2.v5,
                                   neighborColor, neighborElev);
             }
         } else if (neighborElev <= nextNeighborElev) {
-            triangulateCorner(builder, e2.v4, neighborColor, neighborElev, v5, nextNeighborColor, nextNeighborElev,
-                              e1.v4, cellColor, cellElev);
+            triangulateCorner(builder, e2.v5, neighborColor, neighborElev, v5, nextNeighborColor, nextNeighborElev,
+                              e1.v5, cellColor, cellElev);
         } else {
-            triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, e1.v4, cellColor, cellElev, e2.v4,
+            triangulateCorner(builder, v5, nextNeighborColor, nextNeighborElev, e1.v5, cellColor, cellElev, e2.v5,
                               neighborColor, neighborElev);
         }
     }
@@ -399,7 +402,7 @@ static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int r
 
         EdgeVertices edge = makeEdge(v1, v2);
 
-        // Triangle fan from center to subdivided edge (3 triangles).
+        // Triangle fan from center to subdivided edge (4 triangles).
         triangulateEdgeFan(builder, center, edge, cellColor);
 
         // Edge bridges for NE, E, SE (d < 3). Corners for all 6 directions.

@@ -4,14 +4,15 @@
 
 namespace engine {
 
-/// Four vertices defining a subdivided hex edge (3 segments).
-/// v1 is the "left" corner, v4 is the "right" corner.
-/// v2 and v3 are the intermediate subdivision points.
+/// Five vertices defining a subdivided hex edge (4 segments).
+/// v1 is the "left" corner, v5 is the "right" corner.
+/// v3 is the CENTER midpoint (used for river channels).
 struct EdgeVertices {
     Vector3 v1;
     Vector3 v2;
     Vector3 v3;
     Vector3 v4;
+    Vector3 v5;
 };
 
 /// Linearly interpolate between two Vector3 values.
@@ -37,15 +38,17 @@ struct EdgeVertices {
     };
 }
 
-/// Create an EdgeVertices by subdividing the line from corner1 to corner2 into 3 equal segments.
+/// Create EdgeVertices by subdividing corner1->corner2 into 4 equal segments.
 [[nodiscard]] inline EdgeVertices makeEdge(Vector3 corner1, Vector3 corner2) {
-    static constexpr float ONE_THIRD = 1.0F / 3.0F;
-    static constexpr float TWO_THIRDS = 2.0F / 3.0F;
+    static constexpr float QUARTER = 0.25F;
+    static constexpr float HALF = 0.5F;
+    static constexpr float THREE_QUARTER = 0.75F;
     return {
         .v1 = corner1,
-        .v2 = lerpVector3(corner1, corner2, ONE_THIRD),
-        .v3 = lerpVector3(corner1, corner2, TWO_THIRDS),
-        .v4 = corner2,
+        .v2 = lerpVector3(corner1, corner2, QUARTER),
+        .v3 = lerpVector3(corner1, corner2, HALF),
+        .v4 = lerpVector3(corner1, corner2, THREE_QUARTER),
+        .v5 = corner2,
     };
 }
 
