@@ -13,3 +13,4 @@ Thumbs.db
 saves/
 
 .claude/build_asan/
+.claude/worktrees/
