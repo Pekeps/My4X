@@ -1,4 +1,5 @@
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+#include "game/HexDirection.h"
 #include "game/Map.h"
 #include "game/TerrainType.h"
 #include "game/Tile.h"
@@ -231,4 +232,64 @@ TEST(TileTest, MapGenerationSetsElevationFromTerrain) {
         }
     }
 }
+// ── River tests ───────────────────────────────────────────────────────────────
+
+TEST(TileTest, NoRiverByDefault) {
+    game::Tile t(0, 0);
+    EXPECT_FALSE(t.hasRiver());
+    EXPECT_FALSE(t.hasIncomingRiver());
+    EXPECT_FALSE(t.hasOutgoingRiver());
+    EXPECT_FALSE(t.hasRiverBeginOrEnd());
+}
+
+TEST(TileTest, SetOutgoingRiver) {
+    game::Tile t(0, 0);
+    t.setOutgoingRiver(game::HexDirection::E);
+    EXPECT_TRUE(t.hasOutgoingRiver());
+    EXPECT_TRUE(t.hasRiver());
+    EXPECT_TRUE(t.hasRiverBeginOrEnd());
+    EXPECT_EQ(t.outgoingRiverDirection(), game::HexDirection::E);
+    EXPECT_TRUE(t.hasRiverThroughEdge(game::HexDirection::E));
+    EXPECT_FALSE(t.hasRiverThroughEdge(game::HexDirection::NE));
+}
+
+TEST(TileTest, SetIncomingRiver) {
+    game::Tile t(0, 0);
+    t.setIncomingRiver(game::HexDirection::SW);
+    EXPECT_TRUE(t.hasIncomingRiver());
+    EXPECT_TRUE(t.hasRiver());
+    EXPECT_TRUE(t.hasRiverBeginOrEnd());
+}
+
+TEST(TileTest, BothRivers) {
+    game::Tile t(0, 0);
+    t.setIncomingRiver(game::HexDirection::NE);
+    t.setOutgoingRiver(game::HexDirection::SW);
+    EXPECT_TRUE(t.hasRiver());
+    EXPECT_FALSE(t.hasRiverBeginOrEnd());
+}
+
+TEST(TileTest, RemoveRiver) {
+    game::Tile t(0, 0);
+    t.setOutgoingRiver(game::HexDirection::E);
+    t.removeOutgoingRiver();
+    EXPECT_FALSE(t.hasOutgoingRiver());
+    EXPECT_FALSE(t.hasRiver());
+}
+
+TEST(TileTest, WaterLevel) {
+    game::Tile t(0, 0, game::TerrainType::Water);
+    t.setElevation(0);
+    t.setWaterLevel(1);
+    EXPECT_TRUE(t.isUnderwater());
+    EXPECT_EQ(t.waterLevel(), 1);
+}
+
+TEST(TileTest, NotUnderwater) {
+    game::Tile t(0, 0, game::TerrainType::Plains);
+    t.setElevation(2);
+    t.setWaterLevel(1);
+    EXPECT_FALSE(t.isUnderwater());
+}
+
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
