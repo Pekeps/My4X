@@ -46,4 +46,13 @@ static constexpr float NOISE_AXIS_OFFSET = 100.0F;
 /// Scale factor for elevation noise sampling (coarser than vertex noise).
 static constexpr float ELEVATION_NOISE_SCALE = 0.5F;
 
+/// Stream bed Y offset from cell elevation (negative = below surface).
+static constexpr float STREAM_BED_OFFSET = -0.075F;
+
+/// River water surface Y offset from cell elevation.
+static constexpr float WATER_SURFACE_OFFSET = -0.03F;
+
+/// Open water level Y offset from water level elevation.
+static constexpr float WATER_LEVEL_OFFSET = -0.03F;
+
 } // namespace engine::hex_metrics
