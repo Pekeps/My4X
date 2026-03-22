@@ -1091,11 +1091,11 @@ static void renderGameFrame(const game::GameState &state, Camera3D cam,
         }
     }
 
-    engine::drawUnits(state.units(), state.factionRegistry(), models, selectedUnit, PLAYER_FACTION_ID,
+    engine::drawUnits(state.units(), state.factionRegistry(), models, state.map(), selectedUnit, PLAYER_FACTION_ID,
                       &state.diplomacy(), fog, &animator);
-    engine::drawCities(state.cities(), state.factionRegistry(), selectedCity, PLAYER_FACTION_ID, &state.diplomacy(),
-                       fog);
-    engine::drawBuildings(state.buildings(), models, state.factionRegistry(), fog, PLAYER_FACTION_ID);
+    engine::drawCities(state.cities(), state.factionRegistry(), state.map(), selectedCity, PLAYER_FACTION_ID,
+                       &state.diplomacy(), fog);
+    engine::drawBuildings(state.buildings(), models, state.factionRegistry(), state.map(), fog, PLAYER_FACTION_ID);
 
     // Draw 3D combat effects (hit flashes and death effects).
     effects.drawHitFlashes();

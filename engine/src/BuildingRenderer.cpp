@@ -122,7 +122,8 @@ void registerBuildingModels(ModelManager &models) {
 // ── Drawing ─────────────────────────────────────────────────────────────────
 
 void drawBuildings(const std::vector<game::Building> &buildings, const ModelManager &models,
-                   const game::FactionRegistry &factions, const game::FogOfWar *fog, game::FactionId playerFactionId) {
+                   const game::FactionRegistry &factions, const game::Map &map, const game::FogOfWar *fog,
+                   game::FactionId playerFactionId) {
     for (const auto &building : buildings) {
         Color color = resolveBuildingColor(building, factions);
 
@@ -138,7 +139,7 @@ void drawBuildings(const std::vector<game::Building> &buildings, const ModelMana
                 }
             }
 
-            Vector3 pos = hex::tileCenter(tile.row, tile.col);
+            Vector3 pos = hex::tileCenterElevated(tile.row, tile.col, map);
 
             // Try to use a 3D model via ModelManager.
             const auto &key = building.modelKey();

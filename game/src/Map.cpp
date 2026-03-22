@@ -14,7 +14,7 @@ constexpr int DESERT_ELEVATION = 1;
 constexpr int SWAMP_ELEVATION = 1;
 constexpr int FOREST_ELEVATION = 1;
 constexpr int HILLS_ELEVATION = 2;
-constexpr int MOUNTAIN_ELEVATION = 4;
+constexpr int MOUNTAIN_ELEVATION = 3;
 
 constexpr int defaultElevationForTerrain(TerrainType terrain) {
     switch (terrain) {

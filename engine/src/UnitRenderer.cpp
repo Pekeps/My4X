@@ -45,14 +45,15 @@ static constexpr int FALLBACK_CYLINDER_SLICES = 8;
 
 /// Resolve the world-space center for a unit, using the animator's visual
 /// position when available, otherwise falling back to the logical tile center.
-static Vector3 resolveUnitCenter(const game::Unit &unit, std::size_t index, const UnitAnimator *animator) {
+static Vector3 resolveUnitCenter(const game::Unit &unit, std::size_t index, const UnitAnimator *animator,
+                                 const game::Map &map) {
     if (animator != nullptr) {
         auto animPos = animator->getVisualPosition(static_cast<UnitId>(index));
         if (animPos.has_value()) {
             return {animPos->x, animPos->y, animPos->z};
         }
     }
-    return hex::tileCenter(unit.row(), unit.col());
+    return hex::tileCenterElevated(unit.row(), unit.col(), map);
 }
 
 /// Resolve the visual scale for a unit, using the animator when available.
@@ -121,7 +122,7 @@ static void resolveFactionColors(const game::Unit &unit, const game::FactionRegi
 }
 
 void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game::FactionRegistry &factions,
-               const ModelManager &models, int selectedIndex, game::FactionId playerFactionId,
+               const ModelManager &models, const game::Map &map, int selectedIndex, game::FactionId playerFactionId,
                const game::DiplomacyManager *diplomacy, const game::FogOfWar *fog, const UnitAnimator *animator) {
     for (std::size_t i = 0; i < units.size(); ++i) {
         const auto &unit = units.at(i);
@@ -141,7 +142,7 @@ void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game
         Color wireColor{};
         resolveFactionColors(*unit, factions, fillColor, wireColor);
 
-        Vector3 center = resolveUnitCenter(*unit, i, animator);
+        Vector3 center = resolveUnitCenter(*unit, i, animator, map);
         float visualScale = resolveUnitScale(i, animator);
 
         drawUnitModel(*unit, models, fillColor, wireColor, center, visualScale);
@@ -149,7 +150,7 @@ void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game
         // Draw selection ring on the ground under the selected unit.
         if (std::cmp_equal(i, selectedIndex)) {
             Vector3 ringPos = center;
-            ringPos.y = 0.0F; // Ring always on the ground.
+            ringPos.y = center.y; // Ring at terrain elevation.
             DrawCylinder(ringPos, RING_RADIUS, RING_RADIUS, RING_HEIGHT, RING_SLICES, YELLOW);
         }
 
@@ -158,7 +159,7 @@ void drawUnits(const std::vector<std::unique_ptr<game::Unit>> &units, const game
             auto relation = diplomacy->getRelation(playerFactionId, unit->factionId());
             Color dipColor = diplomacy_colors::diplomacyColor(relation);
             Vector3 ringPos = center;
-            ringPos.y = 0.0F; // Ring always on the ground.
+            ringPos.y = center.y; // Ring at terrain elevation.
             DrawCylinder(ringPos, diplomacy_colors::DIPLOMACY_RING_RADIUS, diplomacy_colors::DIPLOMACY_RING_RADIUS,
                          diplomacy_colors::DIPLOMACY_RING_HEIGHT, diplomacy_colors::DIPLOMACY_RING_SLICES, dipColor);
         }

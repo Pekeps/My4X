@@ -3,6 +3,7 @@
 #include "game/Building.h"
 #include "game/FactionRegistry.h"
 #include "game/FogOfWar.h"
+#include "game/Map.h"
 #include <vector>
 namespace engine {
 
@@ -17,7 +18,7 @@ void registerBuildingModels(ModelManager &models);
 /// are hidden and buildings on explored tiles are rendered (they are terrain
 /// improvements).
 void drawBuildings(const std::vector<game::Building> &buildings, const ModelManager &models,
-                   const game::FactionRegistry &factions, const game::FogOfWar *fog = nullptr,
+                   const game::FactionRegistry &factions, const game::Map &map, const game::FogOfWar *fog = nullptr,
                    game::FactionId playerFactionId = 0);
 
 } // namespace engine
