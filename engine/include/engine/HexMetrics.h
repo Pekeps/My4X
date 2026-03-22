@@ -27,13 +27,15 @@ static constexpr float HORIZONTAL_TERRACE_STEP = 1.0F / static_cast<float>(TERRA
 static constexpr float VERTICAL_TERRACE_STEP = 1.0F / static_cast<float>(TERRACE_STEPS + 1);
 
 /// Perlin noise perturbation strength (XZ displacement in world units).
-static constexpr float PERTURBATION_STRENGTH = 0.15F;
+/// Tutorial uses ~40% of outer radius for visible irregularity.
+static constexpr float PERTURBATION_STRENGTH = 0.35F;
 
-/// Perlin noise sampling scale (higher = more stretched, smoother noise).
-static constexpr float NOISE_SCALE = 0.25F;
+/// Perlin noise sampling scale (controls spatial frequency of noise).
+/// Higher = features change faster across the map.
+static constexpr float NOISE_SCALE = 0.8F;
 
 /// Elevation perturbation strength (Y displacement per cell).
-static constexpr float ELEVATION_PERTURBATION_STRENGTH = 0.08F;
+static constexpr float ELEVATION_PERTURBATION_STRENGTH = 0.05F;
 
 /// Number of edge subdivisions (creates this many + 1 vertices per edge).
 static constexpr int EDGE_SUBDIVISIONS = 3;

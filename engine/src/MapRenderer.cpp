@@ -366,6 +366,14 @@ static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map,
 static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int row, int col) {
     Vector3 center = hex::tileCenter(row, col);
     center.y = elevationY(map, row, col);
+
+    // Add per-cell elevation jitter from noise for natural Y variation.
+    const auto &noise = noiseGenerator();
+    float elevJitter =
+        noise.sample(center.x * hex_metrics::ELEVATION_NOISE_SCALE, center.z * hex_metrics::ELEVATION_NOISE_SCALE) *
+        hex_metrics::ELEVATION_PERTURBATION_STRENGTH;
+    center.y += elevJitter;
+
     Color cellColor = getCellColor(map, row, col);
     int cellElev = map.tile(row, col).elevation();
 
