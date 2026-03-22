@@ -22,6 +22,7 @@ add_library(my4x_engine STATIC
     src/CameraCinematic.cpp
     src/UnitAnimator.cpp
     src/HexMeshBuilder.cpp
+    src/PerlinNoise.cpp
 )
 
 target_include_directories(my4x_engine PUBLIC include)
