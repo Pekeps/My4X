@@ -54,6 +54,9 @@ std::vector<std::vector<Tile>> generateTiles(int height, int width, std::uint64_
             auto terrain = allTerrains.at(dist(rng));
             rowTiles.emplace_back(row, col, terrain);
             rowTiles.back().setElevation(defaultElevationForTerrain(terrain));
+            if (terrain == TerrainType::Water) {
+                rowTiles.back().setWaterLevel(1);
+            }
         }
         tiles.push_back(std::move(rowTiles));
     }
