@@ -95,15 +95,11 @@ static Color getCellColor(const game::Map &map, int row, int col) {
 
 /// Perturb a vertex position using Perlin noise (XZ only, Y unchanged).
 static Vector3 perturb(Vector3 pos) {
-    const auto &noise = noiseGenerator();
-    float sx = pos.x * hex_metrics::NOISE_SCALE;
-    float sz = pos.z * hex_metrics::NOISE_SCALE;
-    return {
-        .x = pos.x + (noise.sample(sx, sz) * hex_metrics::PERTURBATION_STRENGTH),
-        .y = pos.y,
-        .z = pos.z + (noise.sample(sx + hex_metrics::NOISE_AXIS_OFFSET, sz + hex_metrics::NOISE_AXIS_OFFSET) *
-                      hex_metrics::PERTURBATION_STRENGTH),
-    };
+    // TEMPORARILY DISABLED to diagnose white gaps.
+    // If gaps disappear without perturbation, the issue is in the noise.
+    // If gaps persist, the issue is in winding/culling.
+    (void)noiseGenerator();
+    return pos;
 }
 
 // ── Edge strip helpers ───────────────────────────────────────────────────────
@@ -368,12 +364,7 @@ static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int r
     Vector3 center = hex::tileCenter(row, col);
     center.y = elevationY(map, row, col);
 
-    // Add per-cell elevation jitter from noise for natural Y variation.
-    const auto &noise = noiseGenerator();
-    float elevJitter =
-        noise.sample(center.x * hex_metrics::ELEVATION_NOISE_SCALE, center.z * hex_metrics::ELEVATION_NOISE_SCALE) *
-        hex_metrics::ELEVATION_PERTURBATION_STRENGTH;
-    center.y += elevJitter;
+    // Elevation jitter disabled for now.
 
     Color cellColor = getCellColor(map, row, col);
     int cellElev = map.tile(row, col).elevation();
