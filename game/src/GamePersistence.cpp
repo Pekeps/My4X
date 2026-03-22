@@ -95,7 +95,6 @@ void GamePersistence::saveGame(const std::string &gameId, const std::string &gam
     int players = countPlayers(state);
     std::string now = nowUtc();
 
-    // INSERT OR REPLACE — simple overwrite strategy.
     const char *sql = "INSERT OR REPLACE INTO games "
                       "(id, name, turn, player_count, created_at, updated_at, state_blob) "
                       "VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6);";
@@ -172,13 +171,14 @@ std::vector<GameSummary> GamePersistence::listGames() const {
 
     std::vector<GameSummary> results;
     while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
-        auto &summary = results.emplace_back();
+        GameSummary summary;
         summary.id = columnString(stmt.get(), COL_ID);
         summary.name = columnString(stmt.get(), COL_NAME);
         summary.turn = sqlite3_column_int(stmt.get(), COL_TURN);
         summary.playerCount = sqlite3_column_int(stmt.get(), COL_PLAYER_COUNT);
         summary.createdAt = columnString(stmt.get(), COL_CREATED_AT);
         summary.updatedAt = columnString(stmt.get(), COL_UPDATED_AT);
+        results.push_back(std::move(summary));
     }
 
     return results;
