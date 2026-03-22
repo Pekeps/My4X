@@ -289,6 +289,7 @@ static void triangulateCorner(HexMeshBuilder &builder, Vector3 bottom, Color bot
         }
     } else {
         builder.addTriangle(perturb(bottom), perturb(left), perturb(right), bottomColor, leftColor, rightColor);
+        builder.addTriangle(perturb(bottom), perturb(right), perturb(left), bottomColor, rightColor, leftColor);
     }
 }
 
@@ -327,11 +328,11 @@ static void triangulateConnection(HexMeshBuilder &builder, const game::Map &map,
         triangulateEdgeStrip(builder, e1, cellColor, e2, neighborColor);
     }
 
-    // Corner triangle: only for NE (d=0) and E (d=1).
+    // Corner triangle for all near directions (NE, E, SE).
     int nextD = (dirIdx + 1) % HEX_SIDES;
     auto nextDir = game::ALL_DIRECTIONS.at(nextD);
     auto nextNeighborOpt = game::neighborCoord(row, col, nextDir, map.height(), map.width());
-    if (dirIdx <= 1 && nextNeighborOpt) {
+    if (nextNeighborOpt) {
         auto [nnr, nnc] = *nextNeighborOpt;
         Color nextNeighborColor = getCellColor(map, nnr, nnc);
         int nextNeighborElev = map.tile(nnr, nnc).elevation();
@@ -389,9 +390,34 @@ static void triangulateCell(HexMeshBuilder &builder, const game::Map &map, int r
         // Triangle fan from center to subdivided edge (3 triangles).
         triangulateEdgeFan(builder, center, edge, cellColor);
 
-        // Edge and corner connections (only NE, E, SE)
+        // Edge bridges for NE, E, SE (d < 3). Corners for all 6 directions.
         if (d < NEAR_DIRECTION_COUNT) {
             triangulateConnection(builder, map, row, col, d, edge, cellColor, cellElev);
+        } else {
+            // Far-direction corners: compute bridge endpoint and draw corner.
+            auto dir = game::ALL_DIRECTIONS.at(d);
+            auto neighborOpt = game::neighborCoord(row, col, dir, map.height(), map.width());
+            int nextD = (d + 1) % HEX_SIDES;
+            auto nextDir = game::ALL_DIRECTIONS.at(nextD);
+            auto nextNeighborOpt = game::neighborCoord(row, col, nextDir, map.height(), map.width());
+            if (neighborOpt && nextNeighborOpt) {
+                auto [nr, nc] = *neighborOpt;
+                auto [nnr, nnc] = *nextNeighborOpt;
+                Vector3 bridge = getBridge(d);
+                float neighborY = elevationY(map, nr, nc);
+                Vector3 v4 = {.x = edge.v4.x + bridge.x, .y = neighborY, .z = edge.v4.z + bridge.z};
+                Vector3 nextBridge = getBridge(nextD);
+                Vector3 v5 = {
+                    .x = edge.v4.x + nextBridge.x, .y = elevationY(map, nnr, nnc), .z = edge.v4.z + nextBridge.z};
+                Color neighborColor = getCellColor(map, nr, nc);
+                Color nextNeighborColor = getCellColor(map, nnr, nnc);
+
+                // Simple triangle with both windings for guaranteed visibility.
+                builder.addTriangle(perturb(edge.v4), perturb(v4), perturb(v5), cellColor, neighborColor,
+                                    nextNeighborColor);
+                builder.addTriangle(perturb(edge.v4), perturb(v5), perturb(v4), cellColor, nextNeighborColor,
+                                    neighborColor);
+            }
         }
     }
 }
